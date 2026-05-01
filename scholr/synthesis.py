@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from scholr.llm import client, llm_parse
+from scholr.llm import get_client, llm_parse
 from scholr.state import ResearchState, SynthesisResult
 
 _SYSTEM = """You are a scientific synthesis engine. Produce a structured explanation grounded \
@@ -37,7 +37,7 @@ async def stream_answer(
     state: ResearchState,
     on_token: Callable[[str], None],
 ) -> str:
-    response = await client.chat.completions.create(
+    response = await get_client().chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": _STREAM_SYSTEM},

@@ -52,7 +52,7 @@ async def test_stream_answer_calls_on_token_and_returns_full_text(mocker):
             yield chunk
 
     mocker.patch(
-        "scholr.synthesis.client.chat.completions.create",
+        "scholr.llm.client.chat.completions.create",
         new_callable=AsyncMock,
         return_value=fake_stream(),
     )
@@ -73,7 +73,7 @@ async def test_stream_answer_skips_empty_deltas(mocker):
             yield chunk
 
     mocker.patch(
-        "scholr.synthesis.client.chat.completions.create",
+        "scholr.llm.client.chat.completions.create",
         new_callable=AsyncMock,
         return_value=fake_stream(),
     )
