@@ -10,6 +10,12 @@ class LLMRefusalError(Exception):
     pass
 
 
+def set_api_key(key: str) -> None:
+    global client
+    os.environ["OPENAI_API_KEY"] = key
+    client = AsyncOpenAI(api_key=key)
+
+
 async def llm_parse(
     system: str,
     user: str,

@@ -1,8 +1,10 @@
 import asyncio
 import argparse
+import os
 import sys
 from uuid import uuid4
 
+from openai import AuthenticationError
 from pyfiglet import figlet_format
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style
@@ -12,6 +14,7 @@ from rich.table import Table
 from rich.text import Text
 from rich import box
 
+from scholr.llm import set_api_key
 from scholr.pipeline import run_pipeline
 
 console = Console()
@@ -80,16 +83,23 @@ async def run_query(query: str, session_id: str) -> str:
         sys.stdout.write(token)
         sys.stdout.flush()
 
-    with console.status("  [dim]initializing...[/dim]", spinner="dots") as status:
-        def on_event(event: str) -> None:
-            status.update(_event_label(event))
+    try:
+      with console.status("  [dim]initializing...[/dim]", spinner="dots") as status:
+          def on_event(event: str) -> None:
+              status.update(_event_label(event))
 
-        state = await run_pipeline(
-            query=query,
-            session_id=session_id,
-            on_event=on_event,
-            on_token=on_token,
-        )
+          state = await run_pipeline(
+              query=query,
+              session_id=session_id,
+              on_event=on_event,
+              on_token=on_token,
+          )
+    except AuthenticationError:
+        if answer_started:
+            console.print()
+        console.print("\n  [red]Invalid API key.[/red]")
+        console.print("  Run [dim]export OPENAI_API_KEY=sk-...[/dim] and restart, or type your key at the prompt.\n")
+        return session_id
 
     out = state.final_output
 
@@ -171,8 +181,22 @@ async def main() -> None:
 
     prompt_session: PromptSession = PromptSession(
         style=Style.from_dict({"prompt": "ansigray"}),
-        history=None,
     )
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        console.print("  [dim]No OPENAI_API_KEY found.[/dim]")
+        try:
+            key = await prompt_session.prompt_async("  API key: ", is_password=True)
+            key = key.strip()
+        except (KeyboardInterrupt, EOFError):
+            console.print("\n  [dim]goodbye[/dim]\n")
+            return
+        if not key:
+            console.print("  [dim]No key provided. Exiting.[/dim]\n")
+            return
+        set_api_key(key)
+        console.print("  [dim]key set for this session — to persist: export OPENAI_API_KEY=sk-...[/dim]")
+        console.print()
 
     first_prompt = True
     while True:
