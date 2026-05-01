@@ -60,6 +60,12 @@ def _truncate(text: str, width: int) -> str:
     return text if len(text) <= width else text[: width - 1] + "…"
 
 
+def _print_wrapped(text: str, width: int = 80) -> None:
+    import textwrap
+    for line in textwrap.wrap(text, width=width):
+        console.print(f"  {line}")
+
+
 def _event_label(event: str) -> str:
     for prefix, label in _LABELS:
         if event.startswith(prefix):
@@ -86,7 +92,13 @@ async def run_query(query: str, session_id: str) -> str:
     try:
         with console.status("  [dim]initializing...[/dim]", spinner="dots") as status:
             def on_event(event: str) -> None:
-                status.update(_event_label(event))
+                if not answer_started:
+                    status.update(_event_label(event))
+                elif "[Synthesis]" in event and "building evidence map" in event:
+                    sys.stdout.write("\n\n")
+                    sys.stdout.flush()
+                    status.update("  [dim]synthesize  [/dim]  building evidence map")
+                    status.start()
 
             state = await run_pipeline(
                 query=query,
@@ -113,13 +125,12 @@ async def run_query(query: str, session_id: str) -> str:
 
     out = state.final_output
 
-    if answer_started:
-        console.print("\n")
-    else:
+    if not answer_started:
         console.print()
         console.print("  [bold]Answer[/bold]")
         console.print()
-        console.print(f"  {out.final_answer}\n")
+        _print_wrapped(out.final_answer)
+    console.print()
 
     for label, content in [
         ("Mechanism",      out.mechanism),
@@ -128,7 +139,7 @@ async def run_query(query: str, session_id: str) -> str:
         ("Open Questions", out.open_questions),
     ]:
         console.print(f"  [dim]{label}[/dim]")
-        console.print(f"  {content}")
+        _print_wrapped(content)
         console.print()
 
     console.rule(style="dim")
