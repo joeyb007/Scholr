@@ -6,7 +6,6 @@ from uuid import uuid4
 from pyfiglet import figlet_format
 from rich.align import Align
 from rich.console import Console
-from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 from rich import box
@@ -14,20 +13,6 @@ from rich import box
 from scholr.pipeline import run_pipeline
 
 console = Console()
-
-
-def _logo() -> Text:
-    raw = figlet_format("Scholr", font="slant")
-    result = Text(justify="center")
-    for char in raw:
-        if char in "/\\":
-            result.append(char, style="bright_white")
-        elif char == "_":
-            result.append(char, style="grey62")
-        else:
-            result.append(char)
-    return result
-
 
 _LABELS: list[tuple[str, str]] = [
     ("[Session]",     "session   "),
@@ -41,10 +26,33 @@ _LABELS: list[tuple[str, str]] = [
     ("[Done]",        "done      "),
 ]
 
+_HINTS = [
+    "explain transformer architecture",
+    "how do diffusion models work",
+    "what are the limits of RLHF",
+]
+
+
+def _print_logo() -> None:
+    for line in figlet_format("Scholr", font="slant").splitlines():
+        styled = Text(no_wrap=True)
+        for char in line:
+            if char in "/\\":
+                styled.append(char, style="bright_white")
+            elif char == "_":
+                styled.append(char, style="grey62")
+            else:
+                styled.append(char)
+        console.print(Align(styled, align="center"))
+
 
 def _short_id(paper_id: str) -> str:
     part = paper_id.split("/abs/")[-1]
     return part.split("v")[0] if "v" in part else part
+
+
+def _truncate(text: str, width: int) -> str:
+    return text if len(text) <= width else text[: width - 1] + "…"
 
 
 def _event_label(event: str) -> str:
@@ -55,7 +63,7 @@ def _event_label(event: str) -> str:
     return f"  [dim]{event}[/dim]"
 
 
-async def run_query(query: str, session_id: str) -> None:
+async def run_query(query: str, session_id: str) -> str:
     answer_started = False
 
     def on_token(token: str) -> None:
@@ -104,12 +112,28 @@ async def run_query(query: str, session_id: str) -> None:
     console.rule(style="dim")
     console.print()
 
-    table = Table(box=box.SIMPLE, show_header=False, padding=(0, 2), show_edge=False)
-    table.add_column("Claim", style="white", ratio=4)
-    table.add_column("Papers", style="dim", ratio=1)
+    paper_by_id = {p.paper_id: p for p in state.papers}
+
+    table = Table(
+        box=box.SIMPLE,
+        show_header=True,
+        header_style="dim",
+        padding=(0, 2),
+        show_edge=False,
+    )
+    table.add_column("arxiv id",  style="dim",   no_wrap=True)
+    table.add_column("paper",     style="dim",   max_width=36)
+    table.add_column("claim",     style="white")
+
     for claim in out.evidence_map:
-        ids = "  ".join(_short_id(pid) for pid in claim.paper_ids)
-        table.add_row(claim.claim, ids)
+        for i, pid in enumerate(claim.paper_ids):
+            paper = paper_by_id.get(pid)
+            title = _truncate(paper.title, 36) if paper else ""
+            table.add_row(
+                _short_id(pid),
+                title,
+                claim.claim if i == 0 else "",
+            )
 
     console.print(f"  [dim]evidence · {len(out.evidence_map)} claims[/dim]")
     console.print()
@@ -137,27 +161,42 @@ async def main() -> None:
     args = parser.parse_args()
 
     console.print()
-    console.print(Align(_logo(), align="center"))
+    _print_logo()
     console.rule(style="dim")
     console.print()
 
     session_id = args.session or str(uuid4())
+    first_prompt = True
 
     while True:
+        if first_prompt:
+            hint = _HINTS[0]
+            console.print(f'  [dim]e.g. "{hint}"[/dim]')
+            first_prompt = False
+
+        console.print("  [dim]ctrl+c to exit[/dim]", end="\r")
         try:
             query = console.input("  [dim]>[/dim] ").strip()
-        except (EOFError, KeyboardInterrupt):
-            console.print()
+        except KeyboardInterrupt:
+            console.print("\n\n  [dim]goodbye[/dim]\n")
+            break
+        except EOFError:
             break
 
         if not query:
             continue
 
         if query.lower() in {"exit", "quit", "q"}:
+            console.print("\n  [dim]goodbye[/dim]\n")
             break
 
         console.print()
         session_id = await run_query(query, session_id)
 
 
-asyncio.run(main())
+def sync_main() -> None:
+    asyncio.run(main())
+
+
+if __name__ == "__main__":
+    sync_main()

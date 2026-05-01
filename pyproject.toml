@@ -17,6 +17,9 @@ dependencies = [
     "pyfiglet>=1.0.2",
 ]
 
+[project.scripts]
+scholr = "cli:sync_main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
