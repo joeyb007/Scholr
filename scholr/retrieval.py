@@ -6,16 +6,16 @@ import httpx
 
 from scholr.state import Paper
 
-_S2_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
-_S2_FIELDS = "paperId,title,abstract,externalIds"
+_OA_URL = "https://api.openalex.org/works"
 _MAX_RESULTS = 8
 _FETCH_TIMEOUT = 30.0
+_DELAY = 0.2  # polite pool allows 10 req/sec; 0.2s keeps us well within that
 
-# With a free API key: 1 req/sec. Without: 100 req/5min (~1 req/3sec).
-_API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "")
-_DELAY = 1.1 if _API_KEY else 3.1
+# Adding an email identifies you to OpenAlex's polite pool (higher rate limits).
+# Set SCHOLR_MAILTO in your environment or it defaults to a generic identifier.
+_MAILTO = os.environ.get("SCHOLR_MAILTO", "scholr-tool")
 
-# One request at a time — enforced globally across all parallel pipelines.
+# Single connection at a time — serialises requests across parallel pipelines.
 _SEMAPHORE = asyncio.Semaphore(1)
 
 
@@ -31,7 +31,7 @@ async def retrieve_papers(
         try:
             async with _SEMAPHORE:
                 return await asyncio.wait_for(
-                    _fetch_s2(query, _MAX_RESULTS),
+                    _fetch_openalex(query, _MAX_RESULTS),
                     timeout=_FETCH_TIMEOUT,
                 )
         except asyncio.TimeoutError:
@@ -52,30 +52,48 @@ async def retrieve_papers(
     return results
 
 
-async def _fetch_s2(query: str, max_results: int) -> list[Paper]:
+async def _fetch_openalex(query: str, max_results: int) -> list[Paper]:
     await asyncio.sleep(_DELAY)
-    headers = {"x-api-key": _API_KEY} if _API_KEY else {}
     async with httpx.AsyncClient(timeout=_FETCH_TIMEOUT) as http:
         resp = await http.get(
-            _S2_URL,
-            params={"query": query, "fields": _S2_FIELDS, "limit": max_results},
-            headers=headers,
+            _OA_URL,
+            params={
+                "search": query,
+                "per-page": max_results,
+                "select": "id,title,abstract_inverted_index,ids",
+                "mailto": _MAILTO,
+            },
         )
         resp.raise_for_status()
-        return _parse_papers(resp.json().get("data", []), query)
+        return _parse_works(resp.json().get("results", []), query)
 
 
-def _parse_papers(data: list[dict], query: str) -> list[Paper]:
+def _reconstruct_abstract(inverted_index: dict | None) -> str:
+    """OpenAlex stores abstracts as an inverted index {word: [positions]}."""
+    if not inverted_index:
+        return ""
+    pairs = [
+        (idx, word)
+        for word, indices in inverted_index.items()
+        for idx in indices
+    ]
+    pairs.sort()
+    return " ".join(word for _, word in pairs)
+
+
+def _parse_works(data: list[dict], query: str) -> list[Paper]:
     papers = []
     for item in data:
-        abstract = item.get("abstract")
+        abstract = _reconstruct_abstract(item.get("abstract_inverted_index"))
         if not abstract:
             continue
-        arxiv_id = (item.get("externalIds") or {}).get("ArXiv")
-        paper_id = f"arXiv:{arxiv_id}" if arxiv_id else item["paperId"]
+        ids = item.get("ids") or {}
+        arxiv_url = ids.get("arxiv", "")
+        arxiv_id = arxiv_url.split("abs/")[-1].rstrip("/") if arxiv_url else ""
+        paper_id = f"arXiv:{arxiv_id}" if arxiv_id else item["id"].split("/")[-1]
         papers.append(Paper(
             paper_id=paper_id,
-            title=item.get("title", "Untitled"),
+            title=item.get("title") or "Untitled",
             abstract=abstract,
             source_query=query,
         ))
