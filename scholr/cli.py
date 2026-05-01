@@ -83,16 +83,28 @@ class _TooComplexError(Exception):
 async def run_query(query: str, session_id: str) -> str:
     answer_started = False
 
+    stream_col = 2
+    wrap_at = min(console.width - 4, 90)
+
     def on_token(token: str) -> None:
-        nonlocal answer_started
+        nonlocal answer_started, stream_col
         if not answer_started:
             answer_started = True
             status.stop()
             console.print()
             console.rule("  answer", align="left", style="dim")
             console.print()
-            console.print("  ", end="")
-        sys.stdout.write(token)
+            sys.stdout.write("  ")
+        for char in token:
+            if char == "\n":
+                sys.stdout.write("\n  ")
+                stream_col = 2
+            elif stream_col >= wrap_at and char == " ":
+                sys.stdout.write("\n  ")
+                stream_col = 2
+            else:
+                sys.stdout.write(char)
+                stream_col += 1
         sys.stdout.flush()
 
     try:
