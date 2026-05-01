@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["scholr*"]
+
+[project]
+name = "scholr"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "openai>=1.40.0",
+    "arxiv>=2.1.0",
+    "mcp[cli]>=1.0.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-mock>=3.12.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = ["e2e: end-to-end tests that hit real APIs (deselect with -m 'not e2e')"]
