@@ -17,7 +17,7 @@ async def expand_papers(
 ) -> ExpansionOutput:
     on_event(f"[Expansion] processing {len(state.papers)} papers")
     papers_text = "\n\n".join(
-        f"paper_id: {p.paper_id}\ntitle: {p.title}\nabstract: {p.abstract}"
+        f"paper_id: {p.paper_id}\ntitle: {p.title}\nabstract: {p.abstract[:600]}"
         for p in state.papers
     )
     user = f"Papers to expand:\n\n{papers_text}"

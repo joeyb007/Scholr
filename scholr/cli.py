@@ -4,7 +4,7 @@ import os
 import sys
 from uuid import uuid4
 
-from openai import AuthenticationError
+from openai import AuthenticationError, RateLimitError
 from pyfiglet import figlet_format
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style
@@ -124,6 +124,11 @@ async def run_query(query: str, session_id: str) -> str:
         if answer_started:
             console.print()
         console.print("\n  [dim]cancelled[/dim]\n")
+        return session_id
+    except RateLimitError as e:
+        if answer_started:
+            console.print()
+        console.print(f"\n  [red]OpenAI rate limit hit.[/red] [dim]{e}[/dim]\n")
         return session_id
     except AuthenticationError:
         if answer_started:
