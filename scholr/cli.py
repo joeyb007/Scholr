@@ -1,6 +1,5 @@
 import asyncio
 import argparse
-import getpass
 import os
 import sys
 from uuid import uuid4
@@ -187,7 +186,7 @@ async def main() -> None:
     if not os.environ.get("OPENAI_API_KEY"):
         console.print("  [dim]No OPENAI_API_KEY found.[/dim]")
         try:
-            key = await asyncio.to_thread(getpass.getpass, "  API key: ")
+            key = await PromptSession().prompt_async("  API key: ", is_password=True)
             key = key.strip()
         except (KeyboardInterrupt, EOFError):
             console.print("\n  [dim]goodbye[/dim]\n")
