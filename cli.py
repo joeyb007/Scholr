@@ -2,6 +2,7 @@ import asyncio
 import argparse
 from uuid import uuid4
 
+from pyfiglet import figlet_format
 from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
@@ -53,7 +54,7 @@ async def main() -> None:
     session_id = args.session or str(uuid4())
 
     console.print()
-    console.rule("[bold]Scholr[/bold]", style="dim")
+    console.print(figlet_format("Scholr", font="slant"), style="bold bright_yellow", end="")
     console.print(f"  [dim]query[/dim]    {query}")
     console.print(f"  [dim]session[/dim]  {session_id}")
     console.print()
