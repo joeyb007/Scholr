@@ -23,7 +23,8 @@ async def retrieve_papers(
         except asyncio.TimeoutError:
             on_event(f"[Retrieval] timeout — skipping: {query}")
             return []
-        except Exception:
+        except Exception as e:
+            on_event(f"[Retrieval] error ({type(e).__name__}): {e}")
             return []
 
     all_results = await asyncio.gather(*[fetch_one(q) for q in queries])
