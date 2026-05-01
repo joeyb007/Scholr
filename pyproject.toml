@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-scholr = "cli:sync_main"
+scholr = "scholr.cli:sync_main"
 
 [project.optional-dependencies]
 dev = [
