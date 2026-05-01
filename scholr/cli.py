@@ -96,7 +96,10 @@ async def run_query(query: str, session_id: str) -> str:
     try:
         with console.status("  [dim]initializing...[/dim]", spinner="dots") as status:
             def on_event(event: str) -> None:
-                if not answer_started:
+                low = event.lower()
+                if "error" in low or "timeout" in low or "failed" in low:
+                    console.print(f"  [dim]{event}[/dim]")
+                elif not answer_started:
                     status.update(_event_label(event))
                 elif "[Synthesis]" in event and "building evidence map" in event:
                     sys.stdout.write("\n\n")
