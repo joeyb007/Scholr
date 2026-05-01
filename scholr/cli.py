@@ -14,7 +14,7 @@ from rich.table import Table
 from rich.text import Text
 from rich import box
 
-from scholr.llm import set_api_key
+from scholr.llm import set_api_key, validate_api_key
 from scholr.pipeline import run_pipeline
 
 console = Console()
@@ -105,6 +105,11 @@ async def run_query(query: str, session_id: str) -> str:
         console.print("\n  [red]Invalid API key.[/red]")
         console.print("  Run [dim]export OPENAI_API_KEY=sk-...[/dim] and restart, or type your key at the prompt.\n")
         return session_id
+    except ValueError as e:
+        if answer_started:
+            console.print()
+        console.print(f"\n  [dim]{e}[/dim]\n")
+        return session_id
 
     out = state.final_output
 
@@ -188,20 +193,41 @@ async def main() -> None:
         style=Style.from_dict({"prompt": "ansigray"}),
     )
 
-    if not os.environ.get("OPENAI_API_KEY"):
-        console.print("  [dim]No OPENAI_API_KEY found.[/dim]")
+    async def _prompt_for_key(reason: str) -> bool:
+        console.print(f"  [dim]{reason}[/dim]")
         try:
             key = await PromptSession().prompt_async("  API key: ", is_password=True)
             key = key.strip()
         except (KeyboardInterrupt, EOFError):
             console.print("\n  [dim]goodbye[/dim]\n")
-            return
+            return False
         if not key:
             console.print("  [dim]No key provided. Exiting.[/dim]\n")
-            return
+            return False
         set_api_key(key)
-        console.print("  [dim]key set for this session — to persist: export OPENAI_API_KEY=sk-...[/dim]")
+        return True
+
+    async def _validate_with_spinner() -> bool:
+        with console.status("  [dim]validating API key...[/dim]", spinner="dots"):
+            return await validate_api_key()
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        if not await _prompt_for_key("No OPENAI_API_KEY found."):
+            return
+        if not await _validate_with_spinner():
+            console.print("  [red]Key rejected by OpenAI.[/red] Check it and try again.\n")
+            return
+        console.print("  [dim]key valid — to persist: export OPENAI_API_KEY=sk-...[/dim]")
         console.print()
+    else:
+        if not await _validate_with_spinner():
+            if not await _prompt_for_key("API key in environment is invalid."):
+                return
+            if not await _validate_with_spinner():
+                console.print("  [red]Key rejected by OpenAI.[/red] Check it and try again.\n")
+                return
+            console.print("  [dim]key valid — to persist: export OPENAI_API_KEY=sk-...[/dim]")
+            console.print()
 
     first_prompt = True
     while True:

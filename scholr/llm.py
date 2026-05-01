@@ -1,6 +1,6 @@
 import os
 from pydantic import BaseModel
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, AuthenticationError
 
 MODEL = "gpt-4o"
 client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", "test-key-for-unit-tests"))
@@ -18,6 +18,14 @@ def set_api_key(key: str) -> None:
     global client
     os.environ["OPENAI_API_KEY"] = key
     client = AsyncOpenAI(api_key=key)
+
+
+async def validate_api_key() -> bool:
+    try:
+        await get_client().models.list()
+        return True
+    except AuthenticationError:
+        return False
 
 
 async def llm_parse(
