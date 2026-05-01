@@ -84,16 +84,21 @@ async def run_query(query: str, session_id: str) -> str:
         sys.stdout.flush()
 
     try:
-      with console.status("  [dim]initializing...[/dim]", spinner="dots") as status:
-          def on_event(event: str) -> None:
-              status.update(_event_label(event))
+        with console.status("  [dim]initializing...[/dim]", spinner="dots") as status:
+            def on_event(event: str) -> None:
+                status.update(_event_label(event))
 
-          state = await run_pipeline(
-              query=query,
-              session_id=session_id,
-              on_event=on_event,
-              on_token=on_token,
-          )
+            state = await run_pipeline(
+                query=query,
+                session_id=session_id,
+                on_event=on_event,
+                on_token=on_token,
+            )
+    except KeyboardInterrupt:
+        if answer_started:
+            console.print()
+        console.print("\n  [dim]cancelled[/dim]\n")
+        return session_id
     except AuthenticationError:
         if answer_started:
             console.print()
