@@ -7,9 +7,9 @@ from scholr.state import Paper
 _FETCH_TIMEOUT = 30.0
 _MAX_RESULTS = 8
 
-# Global semaphore — caps concurrent arXiv requests across all parallel pipelines.
-# arXiv rate-limits aggressively; 2 simultaneous requests is safe.
-_SEMAPHORE = asyncio.Semaphore(2)
+# arXiv ToS: one request at a time, minimum 3 seconds between requests.
+# Single global semaphore enforces this across all parallel pipelines.
+_SEMAPHORE = asyncio.Semaphore(1)
 
 
 async def retrieve_papers(
@@ -46,7 +46,7 @@ async def retrieve_papers(
 
 
 def _fetch_arxiv(query: str, max_results: int) -> list[Paper]:
-    time.sleep(1)  # be a good citizen between requests
+    time.sleep(3)  # arXiv ToS: minimum 3 seconds between requests
     client = arxiv.Client(page_size=max_results, num_retries=3)
     search = arxiv.Search(
         query=query,
