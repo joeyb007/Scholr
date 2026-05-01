@@ -13,7 +13,7 @@ async def retrieve_papers(
     results: list[Paper] = []
     for query in queries:
         on_event(f"[Retrieval] {query}")
-        papers = await asyncio.to_thread(_fetch_arxiv, query, 5)
+        papers = await asyncio.to_thread(_fetch_arxiv, query, 8)
         for p in papers:
             if p.paper_id not in seen:
                 seen.add(p.paper_id)

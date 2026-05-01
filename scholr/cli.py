@@ -4,6 +4,8 @@ import sys
 from uuid import uuid4
 
 from pyfiglet import figlet_format
+from prompt_toolkit import PromptSession
+from prompt_toolkit.styles import Style
 from rich.align import Align
 from rich.console import Console
 from rich.table import Table
@@ -166,19 +168,24 @@ async def main() -> None:
     console.print()
 
     session_id = args.session or str(uuid4())
-    first_prompt = True
 
+    prompt_session: PromptSession = PromptSession(
+        style=Style.from_dict({"prompt": "ansigray"}),
+        history=None,
+    )
+
+    first_prompt = True
     while True:
         if first_prompt:
-            hint = _HINTS[0]
-            console.print(f'  [dim]e.g. "{hint}"[/dim]')
+            console.print(f'  [dim]e.g. "{_HINTS[0]}"[/dim]')
+            console.print("  [dim]ctrl+c to exit[/dim]")
             first_prompt = False
 
-        console.print("  [dim]ctrl+c to exit[/dim]", end="\r")
         try:
-            query = console.input("  [dim]>[/dim] ").strip()
+            query = await prompt_session.prompt_async("  > ")
+            query = query.strip()
         except KeyboardInterrupt:
-            console.print("\n\n  [dim]goodbye[/dim]\n")
+            console.print("\n  [dim]goodbye[/dim]\n")
             break
         except EOFError:
             break
