@@ -1,7 +1,44 @@
 import asyncio
 import argparse
 from uuid import uuid4
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.rule import Rule
+from rich.table import Table
+from rich.text import Text
+from rich import box
+
 from scholr.pipeline import run_pipeline
+
+console = Console()
+
+_EVENT_STYLES: list[tuple[str, str, str]] = [
+    ("[Session]",    "dim cyan",          "SESSION   "),
+    ("[Planner]",    "bold yellow",        "PLANNER   "),
+    ("[Retrieval]",  "cyan",               "FETCH     "),
+    ("[Level",       "bold green",         "EXPAND    "),
+    ("[Expansion]",  "green",              "EXPAND    "),
+    ("[Coverage]",   "magenta",            "COVERAGE  "),
+    ("[Compression]","yellow",             "COMPRESS  "),
+    ("[Synthesis]",  "bold bright_yellow", "SYNTHESIZE"),
+    ("[Done]",       "bold green",         "DONE      "),
+]
+
+
+def _print_event(event: str) -> None:
+    for prefix, style, label in _EVENT_STYLES:
+        if event.startswith(prefix):
+            rest = event[len(prefix):].strip()
+            tag = f"[{style}]{label}[/{style}]"
+            console.print(f"  {tag}  {rest}")
+            return
+    console.print(f"  {event}", style="dim")
+
+
+def _short_id(paper_id: str) -> str:
+    part = paper_id.split("/abs/")[-1]
+    return part.split("v")[0] if "v" in part else part
 
 
 async def main() -> None:
@@ -15,29 +52,67 @@ async def main() -> None:
     query = " ".join(args.query)
     session_id = args.session or str(uuid4())
 
-    print(f"Session: {session_id}")
-    print(f"Query: {query}\n")
+    console.print()
+    console.rule("[bold]Scholr[/bold]", style="dim")
+    console.print(f"  [dim]query[/dim]    {query}")
+    console.print(f"  [dim]session[/dim]  {session_id}")
+    console.print()
 
     state = await run_pipeline(
         query=query,
         session_id=session_id,
-        on_event=lambda e: print(e, flush=True),
+        on_event=_print_event,
     )
 
     out = state.final_output
-    sep = "=" * 60
-    print(f"\n{sep}")
-    print(f"ANSWER\n{out.final_answer}\n")
-    print(f"INTUITION\n{out.intuition}\n")
-    print(f"MECHANISM\n{out.mechanism}\n")
-    print(f"LIMITATIONS\n{out.limitations}\n")
-    print(f"OPEN QUESTIONS\n{out.open_questions}\n")
-    print(f"EVIDENCE ({len(out.evidence_map)} claims)")
+    console.print()
+    console.rule(
+        f"[dim]{out.papers_used} papers · depth {state.depth_reached}[/dim]",
+        style="dim",
+    )
+    console.print()
+
+    console.print(Panel(
+        f"[white]{out.final_answer}[/white]",
+        title="[bold]Answer[/bold]",
+        border_style="bright_yellow",
+        padding=(1, 2),
+    ))
+    console.print()
+
+    for label, content in [
+        ("Intuition",       out.intuition),
+        ("Mechanism",       out.mechanism),
+        ("Limitations",     out.limitations),
+        ("Open Questions",  out.open_questions),
+    ]:
+        console.print(f"  [bold]{label}[/bold]")
+        console.print(f"  {content}")
+        console.print()
+
+    console.rule(f"[dim]Evidence · {len(out.evidence_map)} claims[/dim]", style="dim")
+    console.print()
+
+    table = Table(box=box.SIMPLE, show_header=True, header_style="bold dim")
+    table.add_column("Claim", style="white", ratio=3)
+    table.add_column("Papers", style="cyan", ratio=1)
+
     for claim in out.evidence_map:
-        print(f"  • {claim.claim}")
-        print(f"    sources: {', '.join(claim.paper_ids)}")
-    print(f"\nPapers used: {out.papers_used} | Depth reached: {state.depth_reached}")
-    print(f"Session ID: {state.session_id}")
+        ids = "  ".join(_short_id(pid) for pid in claim.paper_ids)
+        table.add_row(claim.claim, ids)
+
+    console.print(table)
+
+    console.rule(style="dim")
+    footer = Text()
+    footer.append("  session  ", style="dim")
+    footer.append(state.session_id, style="cyan")
+    footer.append("    papers  ", style="dim")
+    footer.append(str(out.papers_used), style="white")
+    footer.append("    depth  ", style="dim")
+    footer.append(str(state.depth_reached), style="white")
+    console.print(footer)
+    console.print()
 
 
 asyncio.run(main())
