@@ -15,6 +15,20 @@ from scholr.pipeline import run_pipeline
 
 console = Console()
 
+
+def _logo() -> Text:
+    raw = figlet_format("Scholr", font="slant")
+    result = Text(justify="center")
+    for char in raw:
+        if char in "/\\":
+            result.append(char, style="bright_white")
+        elif char == "_":
+            result.append(char, style="grey62")
+        else:
+            result.append(char)
+    return result
+
+
 _LABELS: list[tuple[str, str]] = [
     ("[Session]",     "session   "),
     ("[Planner]",     "planner   "),
@@ -123,11 +137,7 @@ async def main() -> None:
     args = parser.parse_args()
 
     console.print()
-    console.print(Align(
-        figlet_format("Scholr", font="slant"),
-        align="center",
-        style="bold white",
-    ))
+    console.print(Align(_logo(), align="center"))
     console.rule(style="dim")
     console.print()
 
