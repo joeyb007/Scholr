@@ -1,8 +1,18 @@
-# Scholr
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo-light.png">
+    <img alt="Scholr" src="assets/logo-dark.png" width="480">
+  </picture>
+</p>
 
-A bounded recursive AI research assistant that retrieves and synthesizes arXiv papers into structured, evidence-grounded explanations.
+<p align="center">
+  A bounded recursive AI research assistant that retrieves and synthesizes arXiv papers into structured, evidence-grounded explanations.
+</p>
 
 Ask a research question. Scholr plans search queries, retrieves papers, recursively expands key concepts, and synthesizes a final explanation where every claim is traced back to a specific paper.
+
+<br>
 
 ---
 
