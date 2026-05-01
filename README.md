@@ -7,10 +7,8 @@
 </p>
 
 <p align="center">
-  A bounded recursive AI research assistant that retrieves and synthesizes arXiv papers into structured, evidence-grounded explanations.
+  A bounded recursive AI research assistant that retrieves and synthesizes academic papers into structured, evidence-grounded explanations.
 </p>
-
-Ask a research question. Scholr plans search queries, retrieves papers, recursively expands key concepts, and synthesizes a final explanation where every claim is traced back to a specific paper.
 
 <br>
 
@@ -18,20 +16,24 @@ Ask a research question. Scholr plans search queries, retrieves papers, recursiv
 
 ## How it works
 
+Ask a research question. Scholr automatically decomposes it into subtopics, runs a bounded recursive retrieval pipeline per subtopic, and synthesizes a final explanation where every claim is traced back to a real paper.
+
 ```
-User Query
-  → Query Planner          (GPT-4o generates arXiv search strings)
-  → Level 0 Retrieval      (arXiv API, up to 5 papers per query)
-  → Concept Expansion      (extract concepts, generate follow-up queries)
-  → Level 1 Retrieval      (follow research leads, bounded to depth=2)
-  → Coverage Check         (one optional retry if gaps detected)
-  → Paper Compression      (abstracts → atomic factual statements)
-  → Synthesis              (structured explanation with evidence map)
+Query
+  → Decomposer        detect subtopics (e.g. "contrast CNNs and RNNs" → 2 threads)
+  → Per subtopic:
+      Planner         GPT-4o generates targeted search queries (retries up to 3× if no results)
+      Retrieval       OpenAlex API, 200M+ papers
+      Expansion       extract concepts, generate follow-up queries
+      Compression     abstracts → atomic factual statements
+      Synthesis       structured explanation per subtopic
+  → Compare           meta-synthesis combining all subtopics with evidence map
 ```
 
-Every claim in the output is mapped to at least one paper ID. Hallucinated citations are stripped automatically. Recursion is hard-capped at depth 2 and 12 total papers — no runaway agents.
-
-Session state (concept map + visited papers) persists across follow-up questions so the planner knows what's already been explored.
+- Hallucinated citations are stripped automatically
+- Recursion is hard-capped at depth 2 and 12 papers per subtopic
+- Session state persists across follow-up questions so the planner avoids already-explored concepts
+- Exposed as both an interactive CLI and an MCP tool for Claude Desktop / Cursor
 
 ---
 
@@ -58,7 +60,7 @@ To install in an isolated environment (recommended):
 pipx install .
 ```
 
-**Optional:** add your email to join OpenAlex's polite pool for higher rate limits:
+**Optional:** add your email to join OpenAlex's polite pool for higher retrieval rate limits:
 
 ```bash
 export SCHOLR_MAILTO=you@example.com
@@ -71,56 +73,18 @@ export SCHOLR_MAILTO=you@example.com
 ### CLI
 
 ```bash
-python cli.py "explain transformer architecture"
+scholr
 ```
 
+Scholr starts an interactive REPL. Type any research question and hit enter:
+
 ```
-Session: a3f2c1d4-...
-Query: explain transformer architecture
-
-[Session] loading context
-[Planner] generating queries
-[Planner] intent=explanation scope=architecture
-[Retrieval] transformer self attention mechanism
-[Retrieval] positional encoding transformers
-[Retrieval] attention bottleneck scaling limitations
-[Level 0] expanding concepts
-[Expansion] processing 8 papers
-[Coverage] evaluating 8 papers
-[Coverage] sufficient=True
-[Compression] extracting facts from 8 papers
-[Synthesis] generating final explanation
-[Synthesis] generated 6 evidence claims
-[Done]
-
-============================================================
-ANSWER
-The Transformer architecture replaces recurrence with self-attention,
-enabling parallel computation over entire sequences...
-
-MECHANISM
-Each token attends to all other tokens via query-key-value dot products.
-Multi-head attention runs this process in parallel across h subspaces...
-
-LIMITATIONS
-Attention scales quadratically with sequence length (O(n²) memory),
-making long-context processing expensive...
-
-EVIDENCE (6 claims)
-  • Self-attention enables parallel computation across sequence positions.
-    sources: http://arxiv.org/abs/1706.03762v7
-  • Multi-head attention captures different representation subspaces.
-    sources: http://arxiv.org/abs/1706.03762v7, http://arxiv.org/abs/1810.04805v2
-  ...
-
-Session ID: a3f2c1d4-...
+  > explain transformer architecture
+  > contrast CNNs and RNNs
+  > what are the limitations of attention mechanisms
 ```
 
-**Continue a session** (planner avoids concepts already explored):
-
-```bash
-python cli.py "what are the alternatives to self-attention" --session a3f2c1d4-...
-```
+Follow-up questions in the same session build on prior context — the planner sees what concepts were already explored and steers toward gaps.
 
 ---
 
@@ -142,27 +106,20 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. The `research` tool will appear and can be called as:
-
-```
-research("explain how diffusion models work")
-research("what are the limitations", session_id="...")
-```
-
-The response includes the full structured explanation, evidence map, execution trace, and session ID for follow-up queries.
+Restart Claude Desktop. The `research` tool will appear automatically.
 
 ---
 
 ## Running tests
 
-Unit tests run fully offline — all LLM and arXiv calls are mocked:
+Unit tests run fully offline — all LLM and retrieval calls are mocked:
 
 ```bash
 pip install -e ".[dev]"
 pytest -v -m "not e2e"
 ```
 
-End-to-end tests hit real APIs (~30–90s, requires API key):
+End-to-end tests hit real APIs (~2–5 min, requires API key):
 
 ```bash
 pytest tests/test_e2e.py -v -m e2e
@@ -176,7 +133,8 @@ pytest tests/test_e2e.py -v -m e2e
 |---|---|
 | Language | Python 3.12+ |
 | LLM | OpenAI GPT-4o via structured outputs |
-| Retrieval | OpenAlex API (200M+ papers, no key required) |
+| Retrieval | OpenAlex API — 200M+ papers, no key required |
+| Orchestration | Flat async pipeline, bounded recursion, multi-thread fan-out |
 | MCP | `mcp` Python SDK (FastMCP) |
 | Sessions | JSON files on disk |
 | Tests | pytest + pytest-asyncio + pytest-mock |

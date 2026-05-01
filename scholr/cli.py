@@ -168,9 +168,9 @@ async def run_query(query: str, session_id: str) -> str:
         padding=(0, 2),
         show_edge=False,
     )
-    table.add_column("arxiv id",  style="dim",   no_wrap=True)
-    table.add_column("paper",     style="dim",   max_width=36)
-    table.add_column("claim",     style="white")
+    table.add_column("Paper ID",  style="dim",   no_wrap=True)
+    table.add_column("Title",     style="dim",   max_width=36)
+    table.add_column("Claim",     style="white")
 
     for claim in out.evidence_map:
         for i, pid in enumerate(claim.paper_ids):
