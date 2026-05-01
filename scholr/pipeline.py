@@ -10,6 +10,7 @@ from scholr.synthesis import stream_answer, synthesize
 
 MAX_DEPTH = 2
 MAX_PAPERS = 12
+MAX_RETRIES = 3
 
 
 async def run_pipeline(
@@ -21,12 +22,22 @@ async def run_pipeline(
     state = load_session(session_id) or fresh_state(query, session_id)
     on_event("[Session] loading context")
 
-    state.planned_queries = await plan_queries(state, on_event)
-    new_papers = await retrieve_papers(state.planned_queries, existing_ids(state), on_event)
-    state.papers.extend(new_papers)
-
-    if not state.papers:
-        raise ValueError(f"No papers retrieved for query: {query!r}. Try rephrasing.")
+    # Retrieval with retry — planner reformulates on each failed attempt
+    failed_queries: list[str] = []
+    for attempt in range(MAX_RETRIES + 1):
+        if attempt > 0:
+            on_event(f"[Planner] no results — reformulating (attempt {attempt}/{MAX_RETRIES})")
+        state.planned_queries = await plan_queries(state, on_event, failed_queries or None)
+        new_papers = await retrieve_papers(state.planned_queries, existing_ids(state), on_event)
+        if new_papers:
+            state.papers.extend(new_papers)
+            break
+        failed_queries = list(state.planned_queries)
+    else:
+        raise ValueError(
+            f"No papers found after {MAX_RETRIES + 1} attempts for: {query!r}. "
+            "Try a more specific or differently phrased question."
+        )
 
     for depth in range(MAX_DEPTH):
         on_event(f"[Level {depth}] expanding concepts")
@@ -61,7 +72,6 @@ async def run_pipeline(
         )
 
     _validate_evidence(state)
-
     save_session(state)
     on_event("[Done]")
     return state

@@ -57,6 +57,18 @@ class SynthesisResult(BaseModel):
     depth_reached: int
 
 
+class SubtopicQuery(BaseModel):
+    subtopic: str   # short label e.g. "CNNs"
+    focus: str      # arXiv-style research question e.g. "convolutional neural networks image classification"
+
+
+class DecomposerOutput(BaseModel):
+    subtopics: list[SubtopicQuery]  # 1–5 items; empty if too_complex
+    too_complex: bool
+    suggestion: str                 # populated only when too_complex=True
+    intent: str                     # "explanation", "comparison", "survey", "limitations", "applications"
+
+
 class ResearchState(BaseModel):
     query: str
     session_id: str

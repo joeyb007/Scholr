@@ -14,6 +14,7 @@ _SYSTEM = """You are a research query planner. Convert a natural language questi
 async def plan_queries(
     state: ResearchState,
     on_event: Callable[[str], None],
+    failed_queries: list[str] | None = None,
 ) -> list[str]:
     on_event("[Planner] generating queries")
     explored = list(state.concept_to_papers.keys())
@@ -21,6 +22,12 @@ async def plan_queries(
         f"Question: {state.query}\n\n"
         f"Already explored concepts (avoid repeating): {explored or 'none'}"
     )
+    if failed_queries:
+        user += (
+            "\n\nThe following queries returned ZERO results from arXiv — "
+            "generate completely different alternatives using broader or more specific terms:\n"
+            + "\n".join(f"  - {q}" for q in failed_queries)
+        )
     output = await llm_parse(_SYSTEM, user, PlannerOutput)
     on_event(f"[Planner] intent={output.intent} scope={output.scope}")
     return output.queries

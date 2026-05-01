@@ -25,7 +25,7 @@ async def test_run_pipeline_raises_on_empty_retrieval(tmp_path, monkeypatch):
 
     with patch("scholr.pipeline.plan_queries", new_callable=AsyncMock, return_value=["q1"]), \
          patch("scholr.pipeline.retrieve_papers", new_callable=AsyncMock, return_value=[]):
-        with pytest.raises(ValueError, match="No papers retrieved"):
+        with pytest.raises(ValueError, match="No papers found"):
             await run_pipeline("test query", "s1")
 
 

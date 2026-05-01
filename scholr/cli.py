@@ -15,7 +15,7 @@ from rich.text import Text
 from rich import box
 
 from scholr.llm import set_api_key, validate_api_key
-from scholr.pipeline import run_pipeline
+from scholr.orchestrator import run_research
 
 console = Console()
 
@@ -74,6 +74,10 @@ def _event_label(event: str) -> str:
     return f"  [dim]{event}[/dim]"
 
 
+class _TooComplexError(Exception):
+    pass
+
+
 async def run_query(query: str, session_id: str) -> str:
     answer_started = False
 
@@ -100,12 +104,18 @@ async def run_query(query: str, session_id: str) -> str:
                     status.update("  [dim]synthesize  [/dim]  building evidence map")
                     status.start()
 
-            state = await run_pipeline(
+            result = await run_research(
                 query=query,
                 session_id=session_id,
                 on_event=on_event,
                 on_token=on_token,
             )
+            if isinstance(result, str):
+                raise _TooComplexError(result)
+            state = result
+    except _TooComplexError as e:
+        console.print(f"\n  [dim]Query too complex.[/dim]\n\n  {e}\n")
+        return session_id
     except KeyboardInterrupt:
         if answer_started:
             console.print()
