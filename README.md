@@ -46,6 +46,18 @@ pip install -e .
 export OPENAI_API_KEY=sk-...
 ```
 
+This registers `scholr` as a command — run it from anywhere:
+
+```bash
+scholr
+```
+
+To install in an isolated environment (recommended):
+
+```bash
+pipx install .
+```
+
 ---
 
 ## Usage
