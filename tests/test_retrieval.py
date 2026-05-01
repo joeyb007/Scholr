@@ -14,7 +14,7 @@ def _make_paper(paper_id: str) -> Paper:
 
 async def test_retrieve_papers_basic(mocker):
     mocker.patch(
-        "scholr.retrieval._fetch_arxiv",
+        "scholr.retrieval._fetch_s2",
         return_value=[_make_paper("p1"), _make_paper("p2")],
     )
     papers = await retrieve_papers(["query1"], set(), lambda _: None)
@@ -24,7 +24,7 @@ async def test_retrieve_papers_basic(mocker):
 
 async def test_retrieve_papers_deduplicates_existing(mocker):
     mocker.patch(
-        "scholr.retrieval._fetch_arxiv",
+        "scholr.retrieval._fetch_s2",
         return_value=[_make_paper("p1"), _make_paper("p2")],
     )
     papers = await retrieve_papers(["query1"], {"p1"}, lambda _: None)
@@ -34,7 +34,7 @@ async def test_retrieve_papers_deduplicates_existing(mocker):
 
 async def test_retrieve_papers_deduplicates_across_queries(mocker):
     mocker.patch(
-        "scholr.retrieval._fetch_arxiv",
+        "scholr.retrieval._fetch_s2",
         return_value=[_make_paper("p1")],
     )
     papers = await retrieve_papers(["q1", "q2"], set(), lambda _: None)
@@ -42,14 +42,14 @@ async def test_retrieve_papers_deduplicates_across_queries(mocker):
 
 
 async def test_retrieve_papers_emits_events(mocker):
-    mocker.patch("scholr.retrieval._fetch_arxiv", return_value=[])
+    mocker.patch("scholr.retrieval._fetch_s2", return_value=[])
     events = []
     await retrieve_papers(["query1"], set(), events.append)
     assert any("query1" in e for e in events)
 
 
 async def test_retrieve_papers_empty_queries(mocker):
-    fetch = mocker.patch("scholr.retrieval._fetch_arxiv", return_value=[])
+    fetch = mocker.patch("scholr.retrieval._fetch_s2", return_value=[])
     papers = await retrieve_papers([], set(), lambda _: None)
     assert papers == []
     fetch.assert_not_called()

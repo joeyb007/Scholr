@@ -52,8 +52,9 @@ def _print_logo() -> None:
 
 
 def _short_id(paper_id: str) -> str:
-    part = paper_id.split("/abs/")[-1]
-    return part.split("v")[0] if "v" in part else part
+    if paper_id.startswith("arXiv:"):
+        return paper_id[6:]
+    return paper_id[:12]
 
 
 def _truncate(text: str, width: int) -> str:

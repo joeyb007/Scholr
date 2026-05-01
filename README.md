@@ -58,6 +58,12 @@ To install in an isolated environment (recommended):
 pipx install .
 ```
 
+**Optional:** get a free Semantic Scholar API key at [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) for 3× faster retrieval (1 req/sec vs 1 req/3sec):
+
+```bash
+export SEMANTIC_SCHOLAR_API_KEY=...
+```
+
 ---
 
 ## Usage
@@ -170,7 +176,7 @@ pytest tests/test_e2e.py -v -m e2e
 |---|---|
 | Language | Python 3.12+ |
 | LLM | OpenAI GPT-4o via structured outputs |
-| Retrieval | arXiv API (`arxiv` package) |
+| Retrieval | Semantic Scholar API (200M+ papers) |
 | MCP | `mcp` Python SDK (FastMCP) |
 | Sessions | JSON files on disk |
 | Tests | pytest + pytest-asyncio + pytest-mock |

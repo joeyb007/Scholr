@@ -1,14 +1,21 @@
 import asyncio
-import time
+import os
 from collections.abc import Callable
-import arxiv
+
+import httpx
+
 from scholr.state import Paper
 
-_FETCH_TIMEOUT = 30.0
+_S2_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
+_S2_FIELDS = "paperId,title,abstract,externalIds"
 _MAX_RESULTS = 8
+_FETCH_TIMEOUT = 30.0
 
-# arXiv ToS: one request at a time, minimum 3 seconds between requests.
-# Single global semaphore enforces this across all parallel pipelines.
+# With a free API key: 1 req/sec. Without: 100 req/5min (~1 req/3sec).
+_API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "")
+_DELAY = 1.1 if _API_KEY else 3.1
+
+# One request at a time — enforced globally across all parallel pipelines.
 _SEMAPHORE = asyncio.Semaphore(1)
 
 
@@ -24,7 +31,7 @@ async def retrieve_papers(
         try:
             async with _SEMAPHORE:
                 return await asyncio.wait_for(
-                    asyncio.to_thread(_fetch_arxiv, query, _MAX_RESULTS),
+                    _fetch_s2(query, _MAX_RESULTS),
                     timeout=_FETCH_TIMEOUT,
                 )
         except asyncio.TimeoutError:
@@ -45,20 +52,31 @@ async def retrieve_papers(
     return results
 
 
-def _fetch_arxiv(query: str, max_results: int) -> list[Paper]:
-    time.sleep(3)  # arXiv ToS: minimum 3 seconds between requests
-    client = arxiv.Client(page_size=max_results, num_retries=3)
-    search = arxiv.Search(
-        query=query,
-        max_results=max_results,
-        sort_by=arxiv.SortCriterion.Relevance,
-    )
-    return [
-        Paper(
-            paper_id=r.entry_id,
-            title=r.title,
-            abstract=r.summary,
-            source_query=query,
+async def _fetch_s2(query: str, max_results: int) -> list[Paper]:
+    await asyncio.sleep(_DELAY)
+    headers = {"x-api-key": _API_KEY} if _API_KEY else {}
+    async with httpx.AsyncClient(timeout=_FETCH_TIMEOUT) as http:
+        resp = await http.get(
+            _S2_URL,
+            params={"query": query, "fields": _S2_FIELDS, "limit": max_results},
+            headers=headers,
         )
-        for r in client.results(search)
-    ]
+        resp.raise_for_status()
+        return _parse_papers(resp.json().get("data", []), query)
+
+
+def _parse_papers(data: list[dict], query: str) -> list[Paper]:
+    papers = []
+    for item in data:
+        abstract = item.get("abstract")
+        if not abstract:
+            continue
+        arxiv_id = (item.get("externalIds") or {}).get("ArXiv")
+        paper_id = f"arXiv:{arxiv_id}" if arxiv_id else item["paperId"]
+        papers.append(Paper(
+            paper_id=paper_id,
+            title=item.get("title", "Untitled"),
+            abstract=abstract,
+            source_query=query,
+        ))
+    return papers
