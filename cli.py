@@ -1,5 +1,6 @@
 import asyncio
 import argparse
+import sys
 from uuid import uuid4
 
 from pyfiglet import figlet_format
@@ -27,68 +28,54 @@ _LABELS: list[tuple[str, str]] = [
 ]
 
 
-def _print_event(event: str) -> None:
-    for prefix, label in _LABELS:
-        if event.startswith(prefix):
-            rest = event[len(prefix):].strip()
-            console.print(f"  [dim]{label}[/dim]  {rest}")
-            return
-    console.print(f"  [dim]{event}[/dim]")
-
-
 def _short_id(paper_id: str) -> str:
     part = paper_id.split("/abs/")[-1]
     return part.split("v")[0] if "v" in part else part
 
 
-async def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Scholr — bounded recursive arXiv research assistant"
-    )
-    parser.add_argument("query", nargs="+", help="Research question")
-    parser.add_argument("--session", default=None, help="Resume a previous session ID")
-    args = parser.parse_args()
+def _event_label(event: str) -> str:
+    for prefix, label in _LABELS:
+        if event.startswith(prefix):
+            rest = event[len(prefix):].strip()
+            return f"  [dim]{label}[/dim]  {rest}"
+    return f"  [dim]{event}[/dim]"
 
-    query = " ".join(args.query)
-    session_id = args.session or str(uuid4())
 
-    console.print()
-    console.print(Align(
-        figlet_format("Scholr", font="slant"),
-        align="center",
-        style="bold white",
-    ))
+async def run_query(query: str, session_id: str) -> None:
+    answer_started = False
 
-    console.rule(style="dim")
-    console.print()
+    def on_token(token: str) -> None:
+        nonlocal answer_started
+        if not answer_started:
+            answer_started = True
+            status.stop()
+            console.print()
+            console.print("  [bold]Answer[/bold]")
+            console.print()
+            console.print("  ", end="")
+        sys.stdout.write(token)
+        sys.stdout.flush()
 
-    console.print(Align(
-        Panel(
-            f"[white]{query}[/white]",
-            subtitle=f"[dim]session · {session_id[:8]}[/dim]",
-            border_style="dim",
-            padding=(0, 2),
-            width=60,
-        ),
-        align="center",
-    ))
-    console.print()
+    with console.status("  [dim]initializing...[/dim]", spinner="dots") as status:
+        def on_event(event: str) -> None:
+            status.update(_event_label(event))
 
-    state = await run_pipeline(
-        query=query,
-        session_id=session_id,
-        on_event=_print_event,
-    )
+        state = await run_pipeline(
+            query=query,
+            session_id=session_id,
+            on_event=on_event,
+            on_token=on_token,
+        )
 
     out = state.final_output
-    console.print()
-    console.rule(style="dim")
-    console.print()
 
-    console.print("  [bold]Answer[/bold]")
-    console.print()
-    console.print(f"  {out.final_answer}")
-    console.print()
+    if answer_started:
+        console.print("\n")
+    else:
+        console.print()
+        console.print("  [bold]Answer[/bold]")
+        console.print()
+        console.print(f"  {out.final_answer}\n")
 
     for label, content in [
         ("Mechanism",      out.mechanism),
@@ -103,20 +90,14 @@ async def main() -> None:
     console.rule(style="dim")
     console.print()
 
-    table = Table(
-        box=box.SIMPLE,
-        show_header=False,
-        padding=(0, 2),
-        show_edge=False,
-    )
+    table = Table(box=box.SIMPLE, show_header=False, padding=(0, 2), show_edge=False)
     table.add_column("Claim", style="white", ratio=4)
     table.add_column("Papers", style="dim", ratio=1)
-
     for claim in out.evidence_map:
         ids = "  ".join(_short_id(pid) for pid in claim.paper_ids)
         table.add_row(claim.claim, ids)
 
-    console.print(Align(f"  [dim]evidence · {len(out.evidence_map)} claims[/dim]", align="left"))
+    console.print(f"  [dim]evidence · {len(out.evidence_map)} claims[/dim]")
     console.print()
     console.print(table)
 
@@ -130,6 +111,43 @@ async def main() -> None:
     footer.append(f"session {state.session_id[:8]}", style="dim")
     console.print(Align(footer, align="center"))
     console.print()
+
+    return state.session_id
+
+
+async def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Scholr — bounded recursive arXiv research assistant"
+    )
+    parser.add_argument("--session", default=None, help="Resume a previous session ID")
+    args = parser.parse_args()
+
+    console.print()
+    console.print(Align(
+        figlet_format("Scholr", font="slant"),
+        align="center",
+        style="bold white",
+    ))
+    console.rule(style="dim")
+    console.print()
+
+    session_id = args.session or str(uuid4())
+
+    while True:
+        try:
+            query = console.input("  [dim]>[/dim] ").strip()
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            break
+
+        if not query:
+            continue
+
+        if query.lower() in {"exit", "quit", "q"}:
+            break
+
+        console.print()
+        session_id = await run_query(query, session_id)
 
 
 asyncio.run(main())

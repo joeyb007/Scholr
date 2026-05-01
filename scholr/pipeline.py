@@ -6,7 +6,7 @@ from scholr.planner import plan_queries
 from scholr.retrieval import retrieve_papers
 from scholr.session import fresh_state, load_session, save_session
 from scholr.state import EvidenceClaim, ResearchState, existing_ids
-from scholr.synthesis import synthesize
+from scholr.synthesis import stream_answer, synthesize
 
 MAX_DEPTH = 2
 MAX_PAPERS = 12
@@ -16,6 +16,7 @@ async def run_pipeline(
     query: str,
     session_id: str,
     on_event: Callable[[str], None] = lambda _: None,
+    on_token: Callable[[str], None] | None = None,
 ) -> ResearchState:
     state = load_session(session_id) or fresh_state(query, session_id)
     on_event("[Session] loading context")
@@ -47,8 +48,18 @@ async def run_pipeline(
     on_event("[Compression] extracting key points")
     state.paper_facts = await compress_papers(state, on_event)
 
-    on_event("[Synthesis] generating final explanation")
+    streamed_answer: str | None = None
+    if on_token is not None:
+        on_event("[Synthesis] streaming answer")
+        streamed_answer = await stream_answer(state, on_token)
+
     state.final_output = await synthesize(state, on_event)
+
+    if streamed_answer is not None:
+        state.final_output = state.final_output.model_copy(
+            update={"final_answer": streamed_answer}
+        )
+
     _validate_evidence(state)
 
     save_session(state)
