@@ -1,9 +1,15 @@
 import asyncio
+import time
 from collections.abc import Callable
 import arxiv
 from scholr.state import Paper
 
-_FETCH_TIMEOUT = 15.0
+_FETCH_TIMEOUT = 30.0
+_MAX_RESULTS = 8
+
+# Global semaphore — caps concurrent arXiv requests across all parallel pipelines.
+# arXiv rate-limits aggressively; 2 simultaneous requests is safe.
+_SEMAPHORE = asyncio.Semaphore(2)
 
 
 async def retrieve_papers(
@@ -16,10 +22,11 @@ async def retrieve_papers(
     async def fetch_one(query: str) -> list[Paper]:
         on_event(f"[Retrieval] {query}")
         try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(_fetch_arxiv, query, 8),
-                timeout=_FETCH_TIMEOUT,
-            )
+            async with _SEMAPHORE:
+                return await asyncio.wait_for(
+                    asyncio.to_thread(_fetch_arxiv, query, _MAX_RESULTS),
+                    timeout=_FETCH_TIMEOUT,
+                )
         except asyncio.TimeoutError:
             on_event(f"[Retrieval] timeout — skipping: {query}")
             return []
@@ -39,7 +46,8 @@ async def retrieve_papers(
 
 
 def _fetch_arxiv(query: str, max_results: int) -> list[Paper]:
-    client = arxiv.Client(num_retries=2)
+    time.sleep(1)  # be a good citizen between requests
+    client = arxiv.Client(page_size=max_results, num_retries=3)
     search = arxiv.Search(
         query=query,
         max_results=max_results,
