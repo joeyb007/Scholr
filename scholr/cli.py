@@ -10,6 +10,9 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style
 from rich.align import Align
 from rich.console import Console
+from rich.markdown import Markdown
+from rich.padding import Padding
+from rich.rule import Rule
 from rich.table import Table
 from rich.text import Text
 from rich import box
@@ -61,10 +64,8 @@ def _truncate(text: str, width: int) -> str:
     return text if len(text) <= width else text[: width - 1] + "…"
 
 
-def _print_wrapped(text: str, width: int = 80) -> None:
-    import textwrap
-    for line in textwrap.wrap(text, width=width):
-        console.print(f"  {line}")
+def _md(text: str) -> Padding:
+    return Padding(Markdown(text), pad=(0, 0, 0, 2))
 
 
 def _event_label(event: str) -> str:
@@ -88,7 +89,7 @@ async def run_query(query: str, session_id: str) -> str:
             answer_started = True
             status.stop()
             console.print()
-            console.print("  [bold]Answer[/bold]")
+            console.rule("  answer", align="left", style="dim")
             console.print()
             console.print("  ", end="")
         sys.stdout.write(token)
@@ -146,22 +147,24 @@ async def run_query(query: str, session_id: str) -> str:
 
     if not answer_started:
         console.print()
-        console.print("  [bold]Answer[/bold]")
+        console.rule("  answer", align="left", style="dim")
         console.print()
-        _print_wrapped(out.final_answer)
-    console.print()
+        console.print(_md(out.final_answer))
+    else:
+        console.print("\n")
 
     for label, content in [
-        ("Mechanism",      out.mechanism),
-        ("Intuition",      out.intuition),
-        ("Limitations",    out.limitations),
-        ("Open Questions", out.open_questions),
+        ("mechanism",      out.mechanism),
+        ("intuition",      out.intuition),
+        ("limitations",    out.limitations),
+        ("open questions", out.open_questions),
     ]:
-        console.print(f"  [dim]{label}[/dim]")
-        _print_wrapped(content)
+        console.rule(f"  {label}", align="left", style="dim")
+        console.print()
+        console.print(_md(content))
         console.print()
 
-    console.rule(style="dim")
+    console.rule("  evidence", align="left", style="dim")
     console.print()
 
     paper_by_id = {p.paper_id: p for p in state.papers}
@@ -173,26 +176,24 @@ async def run_query(query: str, session_id: str) -> str:
         padding=(0, 2),
         show_edge=False,
     )
-    table.add_column("Paper ID",  style="dim",   no_wrap=True)
-    table.add_column("Title",     style="dim",   max_width=36)
-    table.add_column("Claim",     style="white")
+    table.add_column("Paper ID", style="dim",  no_wrap=True)
+    table.add_column("Title",    style="dim",  max_width=34)
+    table.add_column("Claim",    style="white")
 
     for claim in out.evidence_map:
         for i, pid in enumerate(claim.paper_ids):
             paper = paper_by_id.get(pid)
-            title = _truncate(paper.title, 36) if paper else ""
+            title = _truncate(paper.title, 34) if paper else ""
             table.add_row(
                 _short_id(pid),
                 title,
                 claim.claim if i == 0 else "",
             )
 
-    console.print(f"  [dim]evidence · {len(out.evidence_map)} claims[/dim]")
-    console.print()
     console.print(table)
-
     console.rule(style="dim")
     console.print()
+
     footer = Text(justify="center")
     footer.append(f"{out.papers_used} papers", style="white")
     footer.append("  ·  ", style="dim")
