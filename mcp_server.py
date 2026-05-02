@@ -17,11 +17,14 @@ async def research(query: str, session_id: str | None = None, ctx: Context = Non
         session_id: Optional — resume a prior research session.
     """
     sid = session_id or str(uuid4())
+    step = 0
     loop = asyncio.get_event_loop()
 
     def on_event(event: str) -> None:
+        nonlocal step
         if ctx is not None:
-            loop.create_task(ctx.info(event))
+            step += 1
+            loop.create_task(ctx.report_progress(step, 0, event))
 
     state = await run_pipeline(query=query, session_id=sid, on_event=on_event)
     out = state.final_output
