@@ -42,7 +42,7 @@ Query
 Requires Python 3.12+ and an OpenAI API key.
 
 ```bash
-git clone https://github.com/yourusername/scholr
+git clone https://github.com/joeyb007/Scholr
 cd scholr
 pip install -e .
 export OPENAI_API_KEY=sk-...
@@ -106,7 +106,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. The `research` tool will appear automatically.
+Restart Claude Desktop. The `scholr` tool will appear automatically.
 
 ---
 
