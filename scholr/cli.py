@@ -84,7 +84,7 @@ async def run_query(query: str, session_id: str) -> str:
     answer_started = False
 
     stream_col = 2
-    wrap_at = min(console.width - 4, 90)
+    wrap_at = console.width - 4
 
     def on_token(token: str) -> None:
         nonlocal answer_started, stream_col

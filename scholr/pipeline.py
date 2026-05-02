@@ -9,7 +9,7 @@ from scholr.state import EvidenceClaim, ResearchState, existing_ids
 from scholr.synthesis import stream_answer, synthesize
 
 MAX_DEPTH = 2
-MAX_PAPERS = 12
+MAX_PAPERS = 20
 MAX_RETRIES = 3
 
 
@@ -55,6 +55,9 @@ async def run_pipeline(
         on_event("[Coverage] retrieving missing aspects")
         extra = await retrieve_papers(coverage.extra_queries, existing_ids(state), on_event)
         state.papers.extend(extra)
+
+    if len(state.papers) > MAX_PAPERS:
+        state.papers = state.papers[:MAX_PAPERS]
 
     on_event("[Compression] extracting key points")
     state.paper_facts = await compress_papers(state, on_event)

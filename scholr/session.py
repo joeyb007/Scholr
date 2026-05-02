@@ -1,7 +1,7 @@
 from pathlib import Path
 from scholr.state import ResearchState
 
-SESSIONS_DIR = Path("sessions")
+SESSIONS_DIR = Path.home() / ".scholr" / "sessions"
 
 
 def load_session(session_id: str) -> ResearchState | None:
