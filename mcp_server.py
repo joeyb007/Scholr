@@ -5,26 +5,6 @@ from scholr.pipeline import run_pipeline
 
 mcp = FastMCP("scholr")
 
-_STEPS = [
-    ("[Session]",     "Loading session context"),
-    ("[Orchestrator]","Decomposing query"),
-    ("[Planner]",     "Planning search queries"),
-    ("[Retrieval]",   "Fetching papers"),
-    ("[Expansion]",   "Expanding into related concepts"),
-    ("[Coverage]",    "Checking coverage"),
-    ("[Compression]", "Extracting key facts"),
-    ("[Synthesis]",   "Synthesizing answer"),
-]
-_TOTAL = len(_STEPS)
-
-
-def _step_label(event: str) -> str | None:
-    for prefix, label in _STEPS:
-        if event.startswith(prefix):
-            return label
-    return None
-
-
 @mcp.tool(name="scholr")
 async def research(query: str, session_id: str | None = None, ctx: Context = None) -> str:
     """Search and synthesize academic papers to answer any research question.
@@ -37,17 +17,11 @@ async def research(query: str, session_id: str | None = None, ctx: Context = Non
         session_id: Optional — resume a prior research session.
     """
     sid = session_id or str(uuid4())
-    step = 0
     loop = asyncio.get_event_loop()
 
     def on_event(event: str) -> None:
-        nonlocal step
-        if ctx is None:
-            return
-        label = _step_label(event)
-        if label:
-            step += 1
-            loop.create_task(ctx.report_progress(step, _TOTAL, label))
+        if ctx is not None:
+            loop.create_task(ctx.info(event))
 
     state = await run_pipeline(query=query, session_id=sid, on_event=on_event)
     out = state.final_output
