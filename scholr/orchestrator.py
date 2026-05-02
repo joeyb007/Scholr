@@ -47,6 +47,9 @@ async def run_research(
     if decomp.too_complex:
         return decomp.suggestion
 
+    if not decomp.is_followup:
+        session_id = str(uuid4())
+
     subtopics = decomp.subtopics[:MAX_ORCHESTRATORS]
 
     if len(subtopics) == 1:

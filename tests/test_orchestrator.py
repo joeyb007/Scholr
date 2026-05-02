@@ -29,7 +29,7 @@ async def test_run_research_too_complex_returns_suggestion(mocker, tmp_path):
     decomp = DecomposerOutput(
         subtopics=[], too_complex=True,
         suggestion="Try asking about CNNs and RNNs separately.",
-        intent="survey",
+        intent="survey", is_followup=False,
     )
     mocker.patch("scholr.orchestrator.decompose_query", new_callable=AsyncMock, return_value=decomp)
     mocker.patch("scholr.session.SESSIONS_DIR", tmp_path)
@@ -42,7 +42,7 @@ async def test_run_research_too_complex_returns_suggestion(mocker, tmp_path):
 async def test_run_research_single_subtopic_calls_pipeline(mocker, tmp_path):
     decomp = DecomposerOutput(
         subtopics=[SubtopicQuery(subtopic="Transformers", focus="transformer attention")],
-        too_complex=False, suggestion="", intent="explanation",
+        too_complex=False, suggestion="", intent="explanation", is_followup=False,
     )
     mocker.patch("scholr.orchestrator.decompose_query", new_callable=AsyncMock, return_value=decomp)
     expected_state = _make_state("s1", "p1")

@@ -21,8 +21,11 @@ If too_complex=True: write a clear, helpful suggestion explaining what you under
 the query and giving 2–3 specific, researchable alternatives they could ask instead. \
 Be warm and direct — not a canned error message.
 
-If the query uses pronouns like "it", "this", "that" — use the session context to resolve them \
-before classifying.
+Set is_followup=True if the query explicitly references or builds on the prior session query — \
+e.g. uses pronouns ("it", "this", "that", "its"), phrases like "what about", "compare that", \
+"also explain", or names a concept from the prior query without reintroducing it. \
+Set is_followup=False if it is a clearly independent research question with no dependence on \
+the prior context. If there is no session context, always set is_followup=False.
 
 intent must be one of: explanation, comparison, survey, limitations, applications"""
 

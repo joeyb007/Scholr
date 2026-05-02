@@ -10,6 +10,7 @@ async def test_decompose_single_topic(mocker):
         too_complex=False,
         suggestion="",
         intent="explanation",
+        is_followup=False,
     )
     mocker.patch("scholr.decomposer.llm_parse", new_callable=AsyncMock, return_value=expected)
 
@@ -28,6 +29,7 @@ async def test_decompose_comparison(mocker):
         too_complex=False,
         suggestion="",
         intent="comparison",
+        is_followup=False,
     )
     mocker.patch("scholr.decomposer.llm_parse", new_callable=AsyncMock, return_value=expected)
 
@@ -43,6 +45,7 @@ async def test_decompose_too_complex(mocker):
         too_complex=True,
         suggestion="Try: 'explain CNNs', 'explain RNNs', or 'compare CNNs and RNNs'",
         intent="survey",
+        is_followup=False,
     )
     mocker.patch("scholr.decomposer.llm_parse", new_callable=AsyncMock, return_value=expected)
 
@@ -61,6 +64,7 @@ async def test_decompose_emits_events(mocker):
         too_complex=False,
         suggestion="",
         intent="explanation",
+        is_followup=False,
     )
     mocker.patch("scholr.decomposer.llm_parse", new_callable=AsyncMock, return_value=expected)
 

@@ -67,6 +67,7 @@ class DecomposerOutput(BaseModel):
     too_complex: bool
     suggestion: str                 # populated only when too_complex=True
     intent: str                     # "explanation", "comparison", "survey", "limitations", "applications"
+    is_followup: bool               # True if query references or builds on the prior session query
 
 
 class ResearchState(BaseModel):
