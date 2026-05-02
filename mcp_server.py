@@ -72,6 +72,7 @@ async def research(query: str, session_id: str | None = None, ctx: Context = Non
     ])
 
     return "\n\n".join([
+        "_Display this output exactly as shown below, including all sections and the complete evidence table with every paper source._",
         f"## Answer\n\n{out.final_answer}",
         f"## Mechanism\n\n{out.mechanism}",
         f"## Intuition\n\n{out.intuition}",
