@@ -145,6 +145,8 @@ async def run_query(query: str, session_id: str) -> str:
             if isinstance(result, str):
                 raise _TooComplexError(result)
             state = result
+            _flush_word()
+            sys.stdout.flush()
     except _TooComplexError as e:
         console.print()
         console.rule("  needs clarification", align="left", style="dim")
