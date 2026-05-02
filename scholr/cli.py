@@ -64,8 +64,8 @@ def _truncate(text: str, width: int) -> str:
     return text if len(text) <= width else text[: width - 1] + "…"
 
 
-def _md(text: str) -> Padding:
-    return Padding(Markdown(text), pad=(0, 0, 0, 2))
+def _md(text: str) -> Markdown:
+    return Markdown(text)
 
 
 def _event_label(event: str) -> str:
@@ -131,7 +131,11 @@ async def run_query(query: str, session_id: str) -> str:
                 raise _TooComplexError(result)
             state = result
     except _TooComplexError as e:
-        console.print(f"\n  [dim]Query too complex.[/dim]\n\n  {e}\n")
+        console.print()
+        console.rule("  needs clarification", align="left", style="dim")
+        console.print()
+        console.print(Markdown(str(e)))
+        console.print()
         return session_id
     except KeyboardInterrupt:
         if answer_started:
@@ -294,6 +298,10 @@ async def main() -> None:
         if query.lower() in {"exit", "quit", "q"}:
             console.print("\n  [dim]goodbye[/dim]\n")
             break
+
+        if len(query.split()) < 2:
+            console.print("  [dim]Ask a research question — e.g. \"explain transformer attention\"[/dim]\n")
+            continue
 
         console.print()
         session_id = await run_query(query, session_id)

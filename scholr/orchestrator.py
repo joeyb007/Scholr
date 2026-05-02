@@ -3,6 +3,7 @@ from collections.abc import Callable
 from uuid import uuid4
 
 from scholr.decomposer import decompose_query
+from scholr.session import load_session
 from scholr.llm import get_client, llm_parse
 from scholr.pipeline import _validate_evidence, run_pipeline
 from scholr.session import fresh_state, save_session
@@ -35,7 +36,13 @@ async def run_research(
     on_token: Callable[[str], None] | None = None,
 ) -> ResearchState | str:
     """Returns ResearchState on success, or a str suggestion if query is too complex."""
-    decomp = await decompose_query(query, on_event)
+    prior = load_session(session_id)
+    session_context = ""
+    if prior and prior.concept_to_papers:
+        concepts = list(prior.concept_to_papers.keys())[:12]
+        session_context = f"Prior query: {prior.query!r}. Concepts explored: {', '.join(concepts)}"
+
+    decomp = await decompose_query(query, on_event, session_context)
 
     if decomp.too_complex:
         return decomp.suggestion
