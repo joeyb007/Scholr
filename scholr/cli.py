@@ -85,6 +85,19 @@ async def run_query(query: str, session_id: str) -> str:
 
     stream_col = 2
     wrap_at = console.width - 4
+    _word: list[str] = []
+
+    def _flush_word() -> None:
+        nonlocal stream_col
+        if not _word:
+            return
+        word = "".join(_word)
+        _word.clear()
+        if stream_col + len(word) > wrap_at:
+            sys.stdout.write("\n  ")
+            stream_col = 2
+        sys.stdout.write(word)
+        stream_col += len(word)
 
     def on_token(token: str) -> None:
         nonlocal answer_started, stream_col
@@ -97,14 +110,16 @@ async def run_query(query: str, session_id: str) -> str:
             sys.stdout.write("  ")
         for char in token:
             if char == "\n":
+                _flush_word()
                 sys.stdout.write("\n  ")
                 stream_col = 2
-            elif stream_col >= wrap_at and char == " ":
-                sys.stdout.write("\n  ")
-                stream_col = 2
+            elif char == " ":
+                _flush_word()
+                if stream_col < wrap_at:
+                    sys.stdout.write(" ")
+                    stream_col += 1
             else:
-                sys.stdout.write(char)
-                stream_col += 1
+                _word.append(char)
         sys.stdout.flush()
 
     try:

@@ -15,7 +15,7 @@ def load_session(session_id: str) -> ResearchState | None:
 
 
 def save_session(state: ResearchState) -> None:
-    SESSIONS_DIR.mkdir(exist_ok=True)
+    SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
     path = SESSIONS_DIR / f"{state.session_id}.json"
     path.write_text(state.model_dump_json(indent=2))
 
