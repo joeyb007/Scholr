@@ -182,6 +182,8 @@ async def run_query(query: str, session_id: str) -> str:
         console.print()
         console.print(_md(out.final_answer))
     else:
+        _flush_word()
+        sys.stdout.flush()
         console.print("\n")
 
     for label, content in [
