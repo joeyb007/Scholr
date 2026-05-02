@@ -1,31 +1,85 @@
+import asyncio
 from uuid import uuid4
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 from scholr.pipeline import run_pipeline
 
 mcp = FastMCP("scholr")
 
+_STEPS = [
+    ("[Session]",     "Loading session context"),
+    ("[Orchestrator]","Decomposing query"),
+    ("[Planner]",     "Planning search queries"),
+    ("[Retrieval]",   "Fetching papers"),
+    ("[Expansion]",   "Expanding into related concepts"),
+    ("[Coverage]",    "Checking coverage"),
+    ("[Compression]", "Extracting key facts"),
+    ("[Synthesis]",   "Synthesizing answer"),
+]
+_TOTAL = len(_STEPS)
+
+
+def _step_label(event: str) -> str | None:
+    for prefix, label in _STEPS:
+        if event.startswith(prefix):
+            return label
+    return None
+
 
 @mcp.tool()
-async def research(query: str, session_id: str | None = None) -> dict:
-    """Retrieve and synthesize arXiv papers to answer a research question.
+async def research(query: str, session_id: str | None = None, ctx: Context = None) -> str:
+    """Search and synthesize academic papers to answer any research question.
+
+    Autonomously searches OpenAlex, reads and compresses papers, and returns
+    a structured explanation with an evidence map and citations.
 
     Args:
-        query: Natural language research question.
-        session_id: Optional session ID to continue a prior conversation.
-                    A new session is created if omitted.
-
-    Returns:
-        Structured explanation with evidence map, execution trace, and session ID.
+        query: Research question in natural language.
+        session_id: Optional — resume a prior research session.
     """
     sid = session_id or str(uuid4())
-    events: list[str] = []
-    state = await run_pipeline(query=query, session_id=sid, on_event=events.append)
-    return {
-        "session_id": state.session_id,
-        "answer": state.final_output.model_dump(),
-        "execution_trace": events,
-        "papers_used": len(state.papers),
-    }
+    step = 0
+    loop = asyncio.get_event_loop()
+
+    def on_event(event: str) -> None:
+        nonlocal step
+        if ctx is None:
+            return
+        label = _step_label(event)
+        if label:
+            step += 1
+            loop.create_task(ctx.report_progress(step, _TOTAL, label))
+
+    state = await run_pipeline(query=query, session_id=sid, on_event=on_event)
+    out = state.final_output
+    paper_by_id = {p.paper_id: p for p in state.papers}
+
+    def _row(pid: str, claim: str) -> str:
+        paper = paper_by_id.get(pid)
+        title = paper.title if paper else ""
+        if len(title) > 52:
+            title = title[:51] + "…"
+        return f"| `{pid}` | {title} | {claim} |"
+
+    evidence_rows = []
+    for claim in out.evidence_map:
+        for i, pid in enumerate(claim.paper_ids):
+            evidence_rows.append(_row(pid, claim.claim if i == 0 else ""))
+
+    evidence_table = "\n".join([
+        "| Paper ID | Title | Claim |",
+        "|---|---|---|",
+        *evidence_rows,
+    ])
+
+    return "\n\n".join([
+        f"## Answer\n\n{out.final_answer}",
+        f"## Mechanism\n\n{out.mechanism}",
+        f"## Intuition\n\n{out.intuition}",
+        f"## Limitations\n\n{out.limitations}",
+        f"## Open Questions\n\n{out.open_questions}",
+        f"## Evidence\n\n{evidence_table}",
+        f"---\n*{out.papers_used} papers · depth {state.depth_reached} · session `{state.session_id[:8]}`*",
+    ])
 
 
 if __name__ == "__main__":
