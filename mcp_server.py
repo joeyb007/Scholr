@@ -25,7 +25,7 @@ def _step_label(event: str) -> str | None:
     return None
 
 
-@mcp.tool()
+@mcp.tool(name="scholr")
 async def research(query: str, session_id: str | None = None, ctx: Context = None) -> str:
     """Search and synthesize academic papers to answer any research question.
 
