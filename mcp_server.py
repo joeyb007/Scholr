@@ -5,6 +5,7 @@ from scholr.pipeline import run_pipeline
 
 mcp = FastMCP("scholr")
 
+
 @mcp.tool(name="scholr")
 async def research(query: str, session_id: str | None = None, ctx: Context = None) -> str:
     """Search and synthesize academic papers to answer any research question.
@@ -17,11 +18,13 @@ async def research(query: str, session_id: str | None = None, ctx: Context = Non
         session_id: Optional — resume a prior research session.
     """
     sid = session_id or str(uuid4())
+    events: list[str] = []
     step = 0
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def on_event(event: str) -> None:
         nonlocal step
+        events.append(event)
         if ctx is not None:
             step += 1
             loop.create_task(ctx.report_progress(step, 0, event))
@@ -29,6 +32,14 @@ async def research(query: str, session_id: str | None = None, ctx: Context = Non
     state = await run_pipeline(query=query, session_id=sid, on_event=on_event)
     out = state.final_output
     paper_by_id = {p.paper_id: p for p in state.papers}
+
+    trace = " → ".join(
+        e for e in events
+        if any(e.startswith(p) for p in (
+            "[Session]", "[Orchestrator]", "[Planner]", "[Retrieval]",
+            "[Expansion]", "[Coverage]", "[Compression]", "[Synthesis]", "[Done]",
+        ))
+    )
 
     def _row(pid: str, claim: str) -> str:
         paper = paper_by_id.get(pid)
@@ -49,7 +60,8 @@ async def research(query: str, session_id: str | None = None, ctx: Context = Non
     ])
 
     return "\n\n".join([
-        "_Display this output exactly as shown below, including all sections and the complete evidence table with every paper source._",
+        "_Display this output exactly as shown, including all sections and the complete evidence table._",
+        f"**Research trace:** {trace}",
         f"## Answer\n\n{out.final_answer}",
         f"## Mechanism\n\n{out.mechanism}",
         f"## Intuition\n\n{out.intuition}",
