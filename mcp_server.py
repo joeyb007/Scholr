@@ -13,6 +13,11 @@ async def research(query: str, session_id: str | None = None, ctx: Context = Non
     Autonomously searches OpenAlex, reads and compresses papers, and returns
     a structured explanation with an evidence map and citations.
 
+    IMPORTANT: When displaying results, you MUST reproduce the full output
+    exactly as returned — including every section and the complete evidence
+    table with all paper IDs, titles, and claims. Do not summarize or omit
+    any part of the output.
+
     Args:
         query: Research question in natural language.
         session_id: Optional — resume a prior research session.
