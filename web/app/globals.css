@@ -38,7 +38,7 @@ input { font: inherit; color: inherit; background: transparent; border: none; ou
 /* ─── pane loader ────────────────────────────────────────── */
 .pane-loader { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; opacity: 1; transition: opacity 0.35s ease; }
 .pane-loader--out { opacity: 0; pointer-events: none; }
-.pane-loader__logo { width: 28px; height: 28px; border-radius: 6px; background: var(--amber); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 15px; font-weight: 700; color: #16130f; }
+.pane-loader__logo { width: 48px; height: 48px; border-radius: 10px; object-fit: contain; }
 .pane-loader__dots { display: flex; gap: 5px; }
 .pane-loader__dot { width: 4px; height: 4px; border-radius: 50%; background: var(--amber); animation: loader-dot 1.2s ease-in-out infinite; }
 .pane-loader__dot:nth-child(2) { animation-delay: 0.2s; }
@@ -57,8 +57,8 @@ input { font: inherit; color: inherit; background: transparent; border: none; ou
 
 .sidebar__brand { padding: 18px; border-bottom: 1px solid var(--border); }
 .sidebar__brand-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-.sidebar__logo { width: 18px; height: 18px; border-radius: 4px; background: var(--amber); display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 10px; font-weight: 700; color: #16130f; flex-shrink: 0; }
-.sidebar__wordmark { font-family: var(--serif); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+.sidebar__logo { width: 22px; height: 22px; border-radius: 4px; flex-shrink: 0; object-fit: contain; }
+.sidebar__wordmark { font-family: var(--serif); font-size: 16px; font-weight: 600; letter-spacing: 0.04em; }
 .sidebar__version { margin-left: auto; font-family: var(--mono); font-size: 9px; color: var(--faint); }
 
 .sidebar__new { width: 100%; padding: 8px 10px; border: 1px dashed var(--border-s); border-radius: 4px; display: flex; justify-content: space-between; align-items: center; color: var(--fg); font-family: var(--mono); font-size: 10.5px; }
@@ -180,7 +180,7 @@ input { font: inherit; color: inherit; background: transparent; border: none; ou
 /* ─── chip popover ───────────────────────────────────────── */
 @keyframes pop-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .chip-pop { position: relative; }
-.chip-pop__panel { position: absolute; bottom: calc(100% + 8px); left: 0; width: 220px; background: var(--panel); border: 1px solid var(--border-s); border-radius: 6px; padding: 14px; z-index: 50; animation: pop-in 0.12s ease; }
+.chip-pop__panel { width: 220px; background: var(--panel); border: 1px solid var(--border-s); border-radius: 6px; padding: 14px; z-index: 200; animation: pop-in 0.12s ease; }
 .chip-pop__title { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--amber); margin-bottom: 6px; }
 .chip-pop__desc { font-family: var(--serif); font-style: italic; font-size: 12px; color: var(--dim); line-height: 1.5; margin-bottom: 10px; }
 .chip-pop__options { display: flex; flex-direction: column; gap: 1px; }

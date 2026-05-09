@@ -7,7 +7,7 @@ import httpx
 from scholr.state import Paper
 
 _OA_URL = "https://api.openalex.org/works"
-_MAX_RESULTS = 8
+_DEFAULT_K = 8
 _FETCH_TIMEOUT = 30.0
 _DELAY = 0.2  # polite pool allows 10 req/sec; 0.2s keeps us well within that
 
@@ -23,6 +23,8 @@ async def retrieve_papers(
     queries: list[str],
     existing_ids: set[str],
     on_event: Callable[[str], None],
+    k: int = _DEFAULT_K,
+    year_from: int | None = None,
 ) -> list[Paper]:
     seen = set(existing_ids)
 
@@ -31,7 +33,7 @@ async def retrieve_papers(
         try:
             async with _SEMAPHORE:
                 return await asyncio.wait_for(
-                    _fetch_openalex(query, _MAX_RESULTS),
+                    _fetch_openalex(query, k, year_from),
                     timeout=_FETCH_TIMEOUT,
                 )
         except asyncio.TimeoutError:
@@ -52,18 +54,18 @@ async def retrieve_papers(
     return results
 
 
-async def _fetch_openalex(query: str, max_results: int) -> list[Paper]:
+async def _fetch_openalex(query: str, max_results: int, year_from: int | None = None) -> list[Paper]:
     await asyncio.sleep(_DELAY)
+    params: dict = {
+        "search": query,
+        "per-page": max_results,
+        "select": "id,title,abstract_inverted_index,ids,authorships,publication_year,primary_location",
+        "mailto": _MAILTO,
+    }
+    if year_from is not None:
+        params["filter"] = f"from_publication_date:{year_from}-01-01"
     async with httpx.AsyncClient(timeout=_FETCH_TIMEOUT) as http:
-        resp = await http.get(
-            _OA_URL,
-            params={
-                "search": query,
-                "per-page": max_results,
-                "select": "id,title,abstract_inverted_index,ids,authorships,publication_year,primary_location",
-                "mailto": _MAILTO,
-            },
-        )
+        resp = await http.get(_OA_URL, params=params)
         resp.raise_for_status()
         return _parse_works(resp.json().get("results", []), query)
 

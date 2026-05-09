@@ -74,6 +74,13 @@ const STAGE_MAP: [string, string][] = [
 ];
 
 function toStageLabel(event: string): string {
+  // Sub-topic prefixed events e.g. "[CNNs] [Planner] ..." — skip to avoid oscillation
+  if (/^\[[^\]]+\] \[/.test(event)) return "";
+
+  // Multi-topic thread progress: "[Orchestrator] thread 1/2: CNNs"
+  const threadMatch = event.match(/\[Orchestrator\] thread (\d+)\/(\d+): (.+)/);
+  if (threadMatch) return `Researching ${threadMatch[3]} (${threadMatch[1]}/${threadMatch[2]})`;
+
   for (const [prefix, label] of STAGE_MAP) {
     if (event.startsWith(prefix) || event.includes(prefix.slice(1, -1))) return label;
   }
@@ -171,6 +178,7 @@ export default function Home() {
   }, [status]);
 
   function handleNew() {
+    if (activeConv && activeConv.messages.length === 0) return;
     const conv = newConversation();
     setConversations(prev => [conv, ...prev]);
     setActiveId(conv.id);
@@ -233,7 +241,20 @@ export default function Home() {
         body: JSON.stringify({ query, session_id: sessionId, k, year_from: yearFrom }),
       });
 
-      if (!res.ok || !res.body) throw new Error("Request failed");
+      if (!res.ok) {
+        let errMsg = "Request failed";
+        try { const d = await res.json(); errMsg = d.detail ?? errMsg; } catch {}
+        setIsStreaming(false);
+        setProgressStage("");
+        setConversations(prev => prev.map(c => {
+          if (c.id !== activeId) return c;
+          const msgs = [...c.messages];
+          msgs[msgs.length - 1] = { role: "assistant", result: null, error: errMsg };
+          return { ...c, messages: msgs };
+        }));
+        return;
+      }
+      if (!res.body) throw new Error("No response body");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -251,7 +272,7 @@ export default function Home() {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const msg = JSON.parse(line.slice(6));
-          if (msg.type === "progress") setProgressStage(toStageLabel(msg.data));
+          if (msg.type === "progress") { const l = toStageLabel(msg.data); if (l) setProgressStage(l); }
           else if (msg.type === "result") finalResult = msg.data as ResearchResult;
           else if (msg.type === "suggestion") suggestionMsg = msg.data as string;
           else if (msg.type === "error") errorMsg = msg.data as string;
@@ -353,7 +374,7 @@ export default function Home() {
       <div className="app__center">
         {showLoader ? (
           <div className={`pane-loader${loaderFading ? " pane-loader--out" : ""}`}>
-            <div className="pane-loader__logo">S</div>
+            <img src="/scholr.png" className="pane-loader__logo" alt="Scholr" />
             <div className="pane-loader__dots">
               <div className="pane-loader__dot" />
               <div className="pane-loader__dot" />
@@ -361,7 +382,7 @@ export default function Home() {
             </div>
           </div>
         ) : activeConv ? (
-          <div className="pane-content-in" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+          <div className="pane-content-in" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <Thread
               messages={activeConv.messages}
               fakeStreamText={fakeStreamText}

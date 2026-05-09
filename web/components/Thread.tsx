@@ -96,6 +96,11 @@ const ORDERED_STAGES = [
 ];
 
 function stageProgress(stage: string): number {
+  const threadMatch = stage.match(/Researching .+ \((\d+)\/(\d+)\)/);
+  if (threadMatch) {
+    const n = parseInt(threadMatch[1]), total = parseInt(threadMatch[2]);
+    return Math.round(10 + ((n - 0.5) / total) * 70);
+  }
   const idx = ORDERED_STAGES.indexOf(stage);
   if (idx === -1) return stage === "Drafting answer" ? 90 : 8;
   return Math.round(((idx + 1) / ORDERED_STAGES.length) * 85);

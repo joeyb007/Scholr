@@ -54,8 +54,9 @@ async def run_research(
 
     subtopics = decomp.subtopics[:MAX_ORCHESTRATORS]
 
-    if len(subtopics) == 1:
-        return await run_pipeline(subtopics[0].focus, session_id, on_event, on_token, k=k, year_from=year_from)
+    if len(subtopics) <= 1:
+        focus = subtopics[0].focus if subtopics else query
+        return await run_pipeline(focus, session_id, on_event, on_token, k=k, year_from=year_from)
 
     # Fan out — sub-pipelines run without streaming (on_token fires only in meta-synthesis)
     async def run_subtopic(i: int, focus: str, label: str) -> ResearchState | None:

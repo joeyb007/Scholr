@@ -8,7 +8,7 @@ import bcrypt from "bcryptjs";
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PostgresAdapter(pool),
   providers: [
-    Google,
+    Google({ allowDangerousEmailAccountLinking: true }),
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },

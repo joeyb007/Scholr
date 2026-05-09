@@ -89,7 +89,7 @@ export function Sidebar({ conversations, activeId, onSelect, onNew, onDelete }: 
       <div className="sidebar">
         <div className="sidebar__brand">
           <div className="sidebar__brand-row">
-            <div className="sidebar__logo">S</div>
+            <img src="/scholr.png" className="sidebar__logo" alt="Scholr" />
             <span className="sidebar__wordmark">scholr</span>
             <span className="sidebar__version">0.4.2</span>
           </div>

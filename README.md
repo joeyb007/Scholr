@@ -1,9 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
-    <source media="(prefers-color-scheme: light)" srcset="assets/logo-light.png">
-    <img alt="Scholr" src="assets/logo-dark.png" width="480">
-  </picture>
+  <img alt="Scholr" src="web/public/scholr.png" width="100">
 </p>
 
 <p align="center">

@@ -25,7 +25,7 @@ app.add_middleware(
 
 # In-memory rate limit: user_id -> last_query_timestamp
 _rate: dict[str, float] = {}
-_RATE_LIMIT_SECONDS = 90
+_RATE_LIMIT_SECONDS = 10
 
 
 class ResearchRequest(BaseModel):

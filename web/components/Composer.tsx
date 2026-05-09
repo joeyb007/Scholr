@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { useState, useRef, useEffect, KeyboardEvent, CSSProperties } from "react";
+import { createPortal } from "react-dom";
 
 interface ChipOption {
   label: string;
@@ -19,27 +20,45 @@ interface ChipPopoverProps {
 
 function ChipPopover({ chipLabel, title, description, options, value, onChange, active }: ChipPopoverProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [panelStyle, setPanelStyle] = useState<CSSProperties>({});
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  function handleToggle() {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setPanelStyle({
+        position: "fixed",
+        left: rect.left,
+        bottom: window.innerHeight - rect.top + 8,
+      });
+    }
+    setOpen(o => !o);
+  }
 
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (
+        panelRef.current && !panelRef.current.contains(e.target as Node) &&
+        triggerRef.current && !triggerRef.current.contains(e.target as Node)
+      ) setOpen(false);
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
   return (
-    <div className="chip-pop" ref={ref}>
+    <div className="chip-pop">
       <button
+        ref={triggerRef}
         className={`composer__chip${active ? " composer__chip--active" : ""}`}
-        onClick={() => setOpen(o => !o)}
+        onClick={handleToggle}
       >
         {chipLabel}
       </button>
-      {open && (
-        <div className="chip-pop__panel">
+      {open && createPortal(
+        <div className="chip-pop__panel" ref={panelRef} style={panelStyle}>
           <div className="chip-pop__title">{title}</div>
           <div className="chip-pop__desc">{description}</div>
           <div className="chip-pop__options">
@@ -53,7 +72,8 @@ function ChipPopover({ chipLabel, title, description, options, value, onChange, 
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

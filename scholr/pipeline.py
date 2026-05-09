@@ -22,6 +22,7 @@ async def run_pipeline(
     year_from: int | None = None,
 ) -> ResearchState:
     state = load_session(session_id) or fresh_state(query, session_id)
+    state.query = query  # always use the current query for planning and synthesis
     on_event("[Session] loading context")
 
     # Retrieval with retry — planner reformulates on each failed attempt
