@@ -34,6 +34,8 @@ async def run_research(
     session_id: str,
     on_event: Callable[[str], None] = lambda _: None,
     on_token: Callable[[str], None] | None = None,
+    k: int = 8,
+    year_from: int | None = None,
 ) -> ResearchState | str:
     """Returns ResearchState on success, or a str suggestion if query is too complex."""
     prior = load_session(session_id)
@@ -53,14 +55,14 @@ async def run_research(
     subtopics = decomp.subtopics[:MAX_ORCHESTRATORS]
 
     if len(subtopics) == 1:
-        return await run_pipeline(subtopics[0].focus, session_id, on_event, on_token)
+        return await run_pipeline(subtopics[0].focus, session_id, on_event, on_token, k=k, year_from=year_from)
 
     # Fan out — sub-pipelines run without streaming (on_token fires only in meta-synthesis)
     async def run_subtopic(i: int, focus: str, label: str) -> ResearchState | None:
         def prefixed(e: str) -> None:
             on_event(f"[{label}] {e}")
         try:
-            return await run_pipeline(focus, f"{session_id}-{i}", prefixed, on_token=None)
+            return await run_pipeline(focus, f"{session_id}-{i}", prefixed, on_token=None, k=k, year_from=year_from)
         except Exception as e:
             on_event(f"[{label}] failed: {e}")
             return None

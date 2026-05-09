@@ -1,15 +1,76 @@
 "use client";
 
-import { useState, useRef, KeyboardEvent } from "react";
+import { useState, useRef, useEffect, KeyboardEvent } from "react";
+
+interface ChipOption {
+  label: string;
+  value: number | null;
+}
+
+interface ChipPopoverProps {
+  chipLabel: string;
+  title: string;
+  description: string;
+  options: ChipOption[];
+  value: number | null;
+  onChange: (v: number | null) => void;
+  active?: boolean;
+}
+
+function ChipPopover({ chipLabel, title, description, options, value, onChange, active }: ChipPopoverProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div className="chip-pop" ref={ref}>
+      <button
+        className={`composer__chip${active ? " composer__chip--active" : ""}`}
+        onClick={() => setOpen(o => !o)}
+      >
+        {chipLabel}
+      </button>
+      {open && (
+        <div className="chip-pop__panel">
+          <div className="chip-pop__title">{title}</div>
+          <div className="chip-pop__desc">{description}</div>
+          <div className="chip-pop__options">
+            {options.map(opt => (
+              <button
+                key={String(opt.value)}
+                className={`chip-pop__option${opt.value === value ? " chip-pop__option--active" : ""}`}
+                onClick={() => { onChange(opt.value); setOpen(false); }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface ComposerProps {
   onSubmit: (query: string) => void;
   disabled: boolean;
   depth: number;
   onDepthChange: (d: number) => void;
+  yearFrom: number | null;
+  onYearFromChange: (y: number | null) => void;
+  k: number;
+  onKChange: (k: number) => void;
 }
 
-export function Composer({ onSubmit, disabled, depth, onDepthChange }: ComposerProps) {
+export function Composer({ onSubmit, disabled, depth, onDepthChange, yearFrom, onYearFromChange, k, onKChange }: ComposerProps) {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -20,6 +81,10 @@ export function Composer({ onSubmit, disabled, depth, onDepthChange }: ComposerP
       setText("");
     }
   }
+
+  const depthLabel = `depth ${depth}`;
+  const yearLabel = yearFrom === null ? "any year" : `${yearFrom}+`;
+  const kLabel = `k = ${k}`;
 
   return (
     <div className="composer">
@@ -37,18 +102,48 @@ export function Composer({ onSubmit, disabled, depth, onDepthChange }: ComposerP
           />
         </div>
         <div className="composer__chips">
-          {[0, 1, 2].map(d => (
-            <button
-              key={d}
-              onClick={() => onDepthChange(d)}
-              className={`composer__chip${depth === d ? " composer__chip--active" : ""}`}
-            >
-              depth {d}
-            </button>
-          ))}
-          <button className="composer__chip">k = 10</button>
-          <button className="composer__chip">filter: 2010+</button>
-          <button className="composer__chip composer__chip--add">+ model sonnet</button>
+          <span className="composer__params-label">search parameters</span>
+          <ChipPopover
+            chipLabel={depthLabel}
+            title="Research depth"
+            description="How many levels of concept expansion to explore. Higher depth finds more connections but takes longer."
+            options={[
+              { label: "depth 0 — surface scan", value: 0 },
+              { label: "depth 1 — standard", value: 1 },
+              { label: "depth 2 — deep dive", value: 2 },
+            ]}
+            value={depth}
+            onChange={v => onDepthChange(v ?? 1)}
+            active={depth !== 1}
+          />
+          <ChipPopover
+            chipLabel={yearLabel}
+            title="Publication year"
+            description="Filter to papers published after this year. Useful for fast-moving fields where older literature is less relevant."
+            options={[
+              { label: "any year", value: null },
+              { label: "2015+", value: 2015 },
+              { label: "2018+", value: 2018 },
+              { label: "2020+", value: 2020 },
+              { label: "2022+", value: 2022 },
+            ]}
+            value={yearFrom}
+            onChange={onYearFromChange}
+            active={yearFrom !== null}
+          />
+          <ChipPopover
+            chipLabel={kLabel}
+            title="Papers per search"
+            description="Number of papers fetched per query. More papers means broader coverage but a longer wait."
+            options={[
+              { label: "k = 4 — fast", value: 4 },
+              { label: "k = 8 — balanced", value: 8 },
+              { label: "k = 16 — thorough", value: 16 },
+            ]}
+            value={k}
+            onChange={v => onKChange(v ?? 8)}
+            active={k !== 8}
+          />
           <span className="composer__send">↵ send</span>
         </div>
       </div>

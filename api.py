@@ -31,6 +31,8 @@ _RATE_LIMIT_SECONDS = 90
 class ResearchRequest(BaseModel):
     query: str
     session_id: str | None = None
+    k: int = 8
+    year_from: int | None = None
 
 
 def _sse(type: str, data) -> str:
@@ -95,9 +97,11 @@ async def research(body: ResearchRequest, request: Request):
                 session_id=session_id,
                 on_event=on_event,
                 on_token=on_token,
+                k=body.k,
+                year_from=body.year_from,
             )
             if isinstance(result, str):
-                queue.put_nowait(_sse("error", result))
+                queue.put_nowait(_sse("suggestion", result))
             else:
                 queue.put_nowait(_sse("result", _build_result(result)))
         except Exception as e:

@@ -101,6 +101,8 @@ export default function Home() {
   const [progressStage, setProgressStage] = useState("");
   const [hoveredCite, setHoveredCite] = useState<number | null>(null);
   const [depth, setDepth] = useState(1);
+  const [yearFrom, setYearFrom] = useState<number | null>(null);
+  const [k, setK] = useState(8);
   const [ready, setReady] = useState(false);
   const [showLoader, setShowLoader] = useState(true);
   const [loaderFading, setLoaderFading] = useState(false);
@@ -228,7 +230,7 @@ export default function Home() {
           "Content-Type": "application/json",
           ...(userId ? { "X-User-Id": userId } : {}),
         },
-        body: JSON.stringify({ query, session_id: sessionId }),
+        body: JSON.stringify({ query, session_id: sessionId, k, year_from: yearFrom }),
       });
 
       if (!res.ok || !res.body) throw new Error("Request failed");
@@ -237,6 +239,8 @@ export default function Home() {
       const decoder = new TextDecoder();
       let buf = "";
       let finalResult: ResearchResult | null = null;
+      let errorMsg: string | null = null;
+      let suggestionMsg: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -249,9 +253,23 @@ export default function Home() {
           const msg = JSON.parse(line.slice(6));
           if (msg.type === "progress") setProgressStage(toStageLabel(msg.data));
           else if (msg.type === "result") finalResult = msg.data as ResearchResult;
-          else if (msg.type === "error") console.error("Research error:", msg.data);
-          // raw tokens intentionally ignored — we fake-stream from answer_paragraphs
+          else if (msg.type === "suggestion") suggestionMsg = msg.data as string;
+          else if (msg.type === "error") errorMsg = msg.data as string;
         }
+      }
+
+      if (suggestionMsg || errorMsg) {
+        setIsStreaming(false);
+        setProgressStage("");
+        const payload = suggestionMsg
+          ? { role: "assistant" as const, result: null, suggestion: suggestionMsg }
+          : { role: "assistant" as const, result: null, error: errorMsg! };
+        setConversations(prev => prev.map(c => {
+          if (c.id !== activeId) return c;
+          const msgs = [...c.messages];
+          msgs[msgs.length - 1] = payload;
+          return { ...c, messages: msgs };
+        }));
       }
 
       if (finalResult) {
@@ -343,7 +361,7 @@ export default function Home() {
             </div>
           </div>
         ) : activeConv ? (
-          <div className="pane-content-in" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div className="pane-content-in" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
             <Thread
               messages={activeConv.messages}
               fakeStreamText={fakeStreamText}
@@ -359,7 +377,7 @@ export default function Home() {
               title={activeConv.title}
               sessionId={activeConv.sessionId}
             />
-            <Composer onSubmit={handleSubmit} disabled={isStreaming} depth={depth} onDepthChange={setDepth} />
+            <Composer onSubmit={handleSubmit} disabled={isStreaming} depth={depth} onDepthChange={setDepth} yearFrom={yearFrom} onYearFromChange={setYearFrom} k={k} onKChange={setK} />
           </div>
         ) : (
           <div className="app__empty pane-content-in">

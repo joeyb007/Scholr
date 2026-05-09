@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession, signOut } from "next-auth/react";
 import type { Conversation } from "@/types/scholr";
 
 interface SidebarProps {
@@ -61,6 +62,7 @@ function ConfirmModal({ title, onConfirm, onCancel }: ConfirmModalProps) {
 
 export function Sidebar({ conversations, activeId, onSelect, onNew, onDelete }: SidebarProps) {
   const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
+  const { status } = useSession();
 
   function handleDeleteClick(e: React.MouseEvent, conv: Conversation) {
     e.stopPropagation();
@@ -127,7 +129,9 @@ export function Sidebar({ conversations, activeId, onSelect, onNew, onDelete }: 
         <div className="sidebar__footer">
           <div className="sidebar__dot" />
           <span className="sidebar__status">OPENALEX</span>
-          <span className="sidebar__footer-kbd">k</span>
+          {status === "authenticated" && (
+            <button className="sidebar__logout" onClick={() => signOut()}>sign out</button>
+          )}
         </div>
       </div>
     </>

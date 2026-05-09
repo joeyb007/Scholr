@@ -18,6 +18,8 @@ async def run_pipeline(
     session_id: str,
     on_event: Callable[[str], None] = lambda _: None,
     on_token: Callable[[str], None] | None = None,
+    k: int = 8,
+    year_from: int | None = None,
 ) -> ResearchState:
     state = load_session(session_id) or fresh_state(query, session_id)
     on_event("[Session] loading context")
@@ -28,7 +30,7 @@ async def run_pipeline(
         if attempt > 0:
             on_event(f"[Planner] no results — reformulating (attempt {attempt}/{MAX_RETRIES})")
         state.planned_queries = await plan_queries(state, on_event, failed_queries or None)
-        new_papers = await retrieve_papers(state.planned_queries, existing_ids(state), on_event)
+        new_papers = await retrieve_papers(state.planned_queries, existing_ids(state), on_event, k=k, year_from=year_from)
         if new_papers:
             state.papers.extend(new_papers)
             break
@@ -46,14 +48,14 @@ async def run_pipeline(
         if len(state.papers) >= MAX_PAPERS or not follow_up_queries:
             state.depth_reached = depth
             break
-        extra = await retrieve_papers(follow_up_queries[:8], existing_ids(state), on_event)
+        extra = await retrieve_papers(follow_up_queries[:8], existing_ids(state), on_event, k=k, year_from=year_from)
         state.papers.extend(extra)
 
     on_event("[Coverage] checking completeness")
     coverage = await check_coverage(state, on_event)
     if not coverage.sufficient:
         on_event("[Coverage] retrieving missing aspects")
-        extra = await retrieve_papers(coverage.extra_queries, existing_ids(state), on_event)
+        extra = await retrieve_papers(coverage.extra_queries, existing_ids(state), on_event, k=k, year_from=year_from)
         state.papers.extend(extra)
 
     if len(state.papers) > MAX_PAPERS:

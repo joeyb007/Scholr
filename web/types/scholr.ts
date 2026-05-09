@@ -25,6 +25,8 @@ export interface ConversationMessage {
   role: "user" | "assistant";
   query?: string;
   result?: ResearchResult | null;
+  error?: string;
+  suggestion?: string;
 }
 
 export interface Conversation {

@@ -186,6 +186,18 @@ export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming,
                   </div>
                 </div>
               )}
+              {!isStreaming && !showFake && msg.suggestion && (
+                <div className="answer">
+                  <div className="answer__label">Out of scope</div>
+                  <div className="answer__suggestion">{msg.suggestion}</div>
+                </div>
+              )}
+              {!isStreaming && !showFake && msg.error && (
+                <div className="answer">
+                  <div className="answer__label">Error</div>
+                  <div className="answer__error">{msg.error}</div>
+                </div>
+              )}
               {!isStreaming && !showFake && msg.result && (
                 <AssistantMessage
                   result={msg.result ?? null}

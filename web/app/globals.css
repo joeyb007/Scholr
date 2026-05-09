@@ -97,7 +97,8 @@ input { font: inherit; color: inherit; background: transparent; border: none; ou
 .sidebar__footer { padding: 10px 18px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
 .sidebar__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 .sidebar__status { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--dim); }
-.sidebar__footer-kbd { margin-left: auto; font-family: var(--mono); font-size: 9px; color: var(--faint); }
+.sidebar__logout { margin-left: auto; font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; color: var(--faint); }
+.sidebar__logout:hover { color: #e87070; }
 
 /* ─── thread topbar ──────────────────────────────────────── */
 .topbar { padding: 14px 28px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
@@ -134,6 +135,8 @@ input { font: inherit; color: inherit; background: transparent; border: none; ou
 .answer__body p:last-child { margin-bottom: 0; }
 .answer__cursor { color: var(--dim); }
 .answer__bold { color: var(--fg); font-weight: 600; font-style: normal; }
+.answer__suggestion { font-family: var(--serif); font-size: 15px; line-height: 1.7; color: var(--dim); font-style: italic; padding: 4px 0 12px; }
+.answer__error { font-family: var(--mono); font-size: 12px; line-height: 1.6; color: #e87070; padding: 4px 0 12px; }
 
 /* section rows */
 .section { display: grid; grid-template-columns: 120px 1fr; column-gap: 28px; padding: 16px 0; border-top: 1px solid var(--border); }
@@ -169,11 +172,21 @@ input { font: inherit; color: inherit; background: transparent; border: none; ou
 .composer__input::placeholder { color: var(--dim); font-style: italic; }
 .composer__input:disabled { opacity: 0.4; }
 .composer__chips { display: flex; align-items: center; gap: 10px; }
-.composer__chip { padding: 3px 8px; border: 1px solid var(--border-s); border-radius: 3px; font-family: var(--mono); font-size: 10.5px; color: var(--dim); letter-spacing: 0.04em; }
-.composer__chip:hover { border-color: rgba(255,235,200,0.28); color: var(--fg); }
-.composer__chip--active { border-color: var(--amber); color: var(--amber); }
-.composer__chip--add { color: var(--dim); }
+.composer__params-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); white-space: nowrap; margin-right: 2px; }
+.composer__chip { padding: 3px 8px; border: 1px solid var(--amber); border-radius: 3px; font-family: var(--mono); font-size: 10.5px; color: var(--amber); letter-spacing: 0.04em; }
+.composer__chip:hover { border-color: var(--border-s); color: var(--dim); }
 .composer__send { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
+
+/* ─── chip popover ───────────────────────────────────────── */
+@keyframes pop-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.chip-pop { position: relative; }
+.chip-pop__panel { position: absolute; bottom: calc(100% + 8px); left: 0; width: 220px; background: var(--panel); border: 1px solid var(--border-s); border-radius: 6px; padding: 14px; z-index: 50; animation: pop-in 0.12s ease; }
+.chip-pop__title { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--amber); margin-bottom: 6px; }
+.chip-pop__desc { font-family: var(--serif); font-style: italic; font-size: 12px; color: var(--dim); line-height: 1.5; margin-bottom: 10px; }
+.chip-pop__options { display: flex; flex-direction: column; gap: 1px; }
+.chip-pop__option { text-align: left; padding: 5px 8px; border-radius: 3px; font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+.chip-pop__option:hover { background: var(--raised); color: var(--fg); }
+.chip-pop__option--active { color: var(--amber); }
 
 /* ─── evidence panel ─────────────────────────────────────── */
 .evidence { width: 320px; flex-shrink: 0; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
