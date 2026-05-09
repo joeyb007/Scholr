@@ -21,7 +21,14 @@ Rules:
 - Do NOT make any claim unsupported by a provided paper_id
 - final_answer must explicitly compare and contrast — do not describe topics in isolation
 - papers_used must equal the number of distinct paper_ids cited across all evidence_map entries
-- depth_reached must be set to the value provided in the context"""
+- depth_reached must be set to the value provided in the context
+- answer_paragraphs: write the comparison as a list of 3-5 paragraph strings that directly \
+contrast the topics. Embed [n] citation tokens inline at the point of reference, where n is \
+the 1-based position of the paper in the valid_ids list (valid_ids[0] → [1], valid_ids[1] → [2], \
+etc.). Bold 2-3 key technical terms per paragraph using **term** markdown — choose the most \
+important concepts, mechanisms, or named entities that a reader should notice
+- follow_up_questions: generate exactly 3 short, specific research questions not covered by \
+this comparison that would deepen understanding"""
 
 _COMPARE_STREAM_SYSTEM = """You are a scientific writer specialising in comparative analysis. \
 Write a clear, flowing comparison of the provided topics based only on the paper facts given. \
