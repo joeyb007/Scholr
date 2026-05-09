@@ -25,12 +25,13 @@ function SectionRow({ label, text, hoveredCite, onHover, onCiteClick }: SectionR
 
 interface PriorPillProps {
   query: string;
+  expanded: boolean;
+  onToggle: () => void;
 }
 
-function PriorPill({ query }: PriorPillProps) {
-  const [expanded, setExpanded] = useState(false);
+function PriorPill({ query, expanded, onToggle }: PriorPillProps) {
   return (
-    <div className="prior" onClick={() => setExpanded(e => !e)} style={{ cursor: "pointer" }}>
+    <div className="prior" onClick={onToggle} style={{ cursor: "pointer" }}>
       <span className="prior__label">PRIOR ↑</span>
       <span className="prior__preview">{query}</span>
       <span className="prior__expand">{expanded ? "collapse" : "expand"}</span>
@@ -40,8 +41,6 @@ function PriorPill({ query }: PriorPillProps) {
 
 interface AssistantMessageProps {
   result: ResearchResult | null;
-  streamingAnswer: string;
-  isStreaming: boolean;
   hoveredCite: number | null;
   onHover: (n: number | null) => void;
   onCiteClick: (n: number) => void;
@@ -123,6 +122,16 @@ interface ThreadProps {
 }
 
 export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming, progressStage, hoveredCite, onHover, onCiteClick, onFollowUp, onExportBibtex, onShare, title, sessionId }: ThreadProps) {
+  const [expandedPriors, setExpandedPriors] = useState<Set<number>>(new Set());
+
+  function togglePrior(i: number) {
+    setExpandedPriors(prev => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      return next;
+    });
+  }
+
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div className="topbar">
@@ -142,10 +151,36 @@ export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming,
       <div className="thread">
         {messages.map((msg, i) => {
           const isPrior = msg.role === "user" && i < messages.length - 2;
+          const isPriorAssistant = msg.role === "assistant" && i > 0 &&
+            messages[i - 1]?.role === "user" && (i - 1) < messages.length - 2;
 
           if (isPrior) {
-            return <PriorPill key={i} query={msg.query ?? ""} />;
+            const expanded = expandedPriors.has(i);
+            return (
+              <div key={i}>
+                <PriorPill query={msg.query ?? ""} expanded={expanded} onToggle={() => togglePrior(i)} />
+                {expanded && (
+                  <>
+                    <div className="question">
+                      <div className="question__label">You asked</div>
+                      <div className="question__text">{msg.query}</div>
+                    </div>
+                    {messages[i + 1]?.result && (
+                      <AssistantMessage
+                        result={messages[i + 1].result ?? null}
+                        hoveredCite={hoveredCite}
+                        onHover={onHover}
+                        onCiteClick={onCiteClick}
+                        onFollowUp={onFollowUp}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            );
           }
+
+          if (isPriorAssistant) return null;
 
           if (msg.role === "user") {
             const result = messages[i + 1]?.result;
@@ -206,8 +241,6 @@ export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming,
               {!isStreaming && !showFake && msg.result && (
                 <AssistantMessage
                   result={msg.result ?? null}
-                  streamingAnswer=""
-                  isStreaming={false}
                   hoveredCite={hoveredCite}
                   onHover={onHover}
                   onCiteClick={onCiteClick}

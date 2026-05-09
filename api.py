@@ -87,16 +87,12 @@ async def research(body: ResearchRequest, request: Request):
     def on_event(event: str) -> None:
         queue.put_nowait(_sse("progress", event))
 
-    def on_token(token: str) -> None:
-        queue.put_nowait(_sse("token", token))
-
     async def run() -> None:
         try:
             result = await run_research(
                 query=body.query,
                 session_id=session_id,
                 on_event=on_event,
-                on_token=on_token,
                 k=body.k,
                 year_from=body.year_from,
             )

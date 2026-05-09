@@ -18,13 +18,13 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { title, depthReached, papersUsed, messages } = await req.json();
+  const { id: clientId, title, depthReached, papersUsed, messages } = await req.json();
   const userId = (session.user as { id: string }).id;
 
   const { rows: [conv] } = await pool.query(
-    `INSERT INTO conversations (user_id, title, depth_reached, papers_used)
-     VALUES ($1, $2, $3, $4) RETURNING id`,
-    [userId, title, depthReached ?? 0, papersUsed ?? 0]
+    `INSERT INTO conversations (id, user_id, title, depth_reached, papers_used)
+     VALUES (COALESCE($1::uuid, gen_random_uuid()), $2, $3, $4, $5) RETURNING id`,
+    [clientId ?? null, userId, title, depthReached ?? 0, papersUsed ?? 0]
   );
 
   for (const msg of messages ?? []) {

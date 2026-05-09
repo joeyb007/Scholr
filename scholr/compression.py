@@ -25,13 +25,16 @@ async def compress_papers(
     state: ResearchState,
     on_event: Callable[[str], None],
 ) -> dict[str, list[str]]:
+    import asyncio
     on_event(f"[Compression] extracting facts from {len(state.papers)} papers")
-    results: dict[str, list[str]] = {}
+    batches = [state.papers[i : i + _BATCH_SIZE] for i in range(0, len(state.papers), _BATCH_SIZE)]
 
-    for i in range(0, len(state.papers), _BATCH_SIZE):
-        batch = state.papers[i : i + _BATCH_SIZE]
-        output = await llm_parse(_SYSTEM, f"Papers to compress:\n\n{_format_batch(batch)}", CompressionOutput)
+    async def compress_batch(batch: list[Paper]) -> CompressionOutput:
+        return await llm_parse(_SYSTEM, f"Papers to compress:\n\n{_format_batch(batch)}", CompressionOutput)
+
+    outputs = await asyncio.gather(*[compress_batch(b) for b in batches])
+    results: dict[str, list[str]] = {}
+    for output in outputs:
         for c in output.compressions:
             results[c.paper_id] = c.key_points
-
     return results

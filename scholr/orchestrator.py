@@ -68,13 +68,11 @@ async def run_research(
             on_event(f"[{label}] failed: {e}")
             return None
 
-    on_event(f"[Orchestrator] running {len(subtopics)} research threads sequentially")
-    states: list[ResearchState] = []
+    on_event(f"[Orchestrator] running {len(subtopics)} research threads in parallel")
     for i, st in enumerate(subtopics):
         on_event(f"[Orchestrator] thread {i + 1}/{len(subtopics)}: {st.subtopic}")
-        result = await run_subtopic(i, st.focus, st.subtopic)
-        if result is not None:
-            states.append(result)
+    results = await asyncio.gather(*[run_subtopic(i, st.focus, st.subtopic) for i, st in enumerate(subtopics)])
+    states: list[ResearchState] = [r for r in results if r is not None]
 
     if not states:
         raise ValueError(f"All research threads failed for: {query!r}. Try rephrasing.")

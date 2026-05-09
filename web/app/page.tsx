@@ -127,7 +127,7 @@ export default function Home() {
   }, [ready]);
 
   const activeConv = conversations.find(c => c.id === activeId) ?? null;
-  const lastResult = activeConv?.messages.findLast(m => m.role === "assistant")?.result ?? null;
+  const lastResult = activeConv?.messages.findLast(m => m.role === "assistant" && m.result != null)?.result ?? null;
 
   const citedPapers = lastResult?.papers ?? [];
 
@@ -213,6 +213,7 @@ export default function Home() {
   async function handleSubmit(query: string) {
     if (!activeId || isStreaming) return;
 
+    const isFirstQuery = (activeConv?.messages.length ?? 0) === 0;
     const userMsg: ConversationMessage = { role: "user", query };
     const assistantMsg: ConversationMessage = { role: "assistant", result: null };
 
@@ -322,13 +323,23 @@ export default function Home() {
         }, 22);
 
         if (status === "authenticated") {
-          const conv = conversations.find(c => c.id === activeId);
-          if (conv) {
+          if (isFirstQuery) {
             fetch("/api/conversations", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                title: conv.messages.length === 0 ? query.slice(0, 60) : conv.title,
+                id: activeId,
+                title: query.slice(0, 60),
+                depthReached: fr.depth_reached,
+                papersUsed: fr.papers_used,
+                messages: [userMsg, { role: "assistant", result: fr }],
+              }),
+            }).catch(() => {});
+          } else {
+            fetch(`/api/conversations/${activeId}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
                 depthReached: fr.depth_reached,
                 papersUsed: fr.papers_used,
                 messages: [userMsg, { role: "assistant", result: fr }],
