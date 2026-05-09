@@ -7,7 +7,14 @@ entirely in the provided paper facts. Rules:
 - Every claim in evidence_map MUST cite at least one paper_id from the provided list
 - Do NOT make any claim that is not supported by a paper_id in the list
 - papers_used must equal the number of distinct paper_ids cited across all evidence_map entries
-- depth_reached must be set to the value provided in the context"""
+- depth_reached must be set to the value provided in the context
+- answer_paragraphs: write the answer as a list of 2-4 paragraph strings. Embed [n] citation \
+tokens inline at the point of reference, where n is the 1-based position of the paper in the \
+valid_ids list (valid_ids[0] → [1], valid_ids[1] → [2], etc.). Bold 2-3 key technical terms \
+per paragraph using **term** markdown — choose the most important concepts, mechanisms, or \
+named entities that a reader should notice
+- follow_up_questions: generate exactly 3 short, specific research questions not covered by \
+this answer that would deepen understanding of the topic"""
 
 _STREAM_SYSTEM = """You are a scientific writer. Answer the research question in clear, \
 flowing prose based only on the provided paper facts. Write 2-4 paragraphs. \

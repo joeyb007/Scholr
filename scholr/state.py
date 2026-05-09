@@ -7,6 +7,9 @@ class Paper(BaseModel):
     title: str
     abstract: str
     source_query: str
+    authors: str = ""
+    year: int | None = None
+    venue: str = ""
 
 
 class PlannerOutput(BaseModel):
@@ -55,6 +58,8 @@ class SynthesisResult(BaseModel):
     evidence_map: list[EvidenceClaim]
     papers_used: int
     depth_reached: int
+    answer_paragraphs: list[str] = []
+    follow_up_questions: list[str] = []
 
 
 class SubtopicQuery(BaseModel):

@@ -1,124 +1,234 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useSession } from "next-auth/react";
+import type { Conversation, ConversationMessage, ResearchResult } from "@/types/scholr";
+import { Sidebar } from "@/components/Sidebar";
+import { Thread } from "@/components/Thread";
+import { EvidencePanel } from "@/components/EvidencePanel";
+import { Composer } from "@/components/Composer";
+import { AuthGate } from "@/components/AuthGate";
+import { downloadBibtex } from "@/lib/bibtex";
 
-type Progress = string;
-
-interface EvidencePaper {
-  id: string;
-  title: string;
+// Renumber citations to sequential 1-based order of first appearance.
+// Keeps evidence panel badges in sync with [n] tokens in the answer text.
+function remapCitations(result: ResearchResult): ResearchResult {
+  const order: number[] = [];
+  const seen = new Set<number>();
+  for (const para of result.answer_paragraphs) {
+    for (const m of para.matchAll(/\[(\d+)\]/g)) {
+      const n = parseInt(m[1]);
+      if (!seen.has(n)) { seen.add(n); order.push(n); }
+    }
+  }
+  if (order.length === 0) return result;
+  const remap = new Map(order.map((n, i) => [n, i + 1]));
+  const answer_paragraphs = result.answer_paragraphs.map(p =>
+    p.replace(/\[(\d+)\]/g, (_, n) => {
+      const newN = remap.get(parseInt(n));
+      return newN !== undefined ? `[${newN}]` : `[${n}]`;
+    })
+  );
+  const papers = result.papers
+    .filter(p => remap.has(p.n))
+    .map(p => ({ ...p, n: remap.get(p.n)! }))
+    .sort((a, b) => a.n - b.n);
+  return { ...result, answer_paragraphs, papers };
 }
 
-interface EvidenceClaim {
-  claim: string;
-  papers: EvidencePaper[];
+function applyRemapToMessages(messages: ConversationMessage[]): ConversationMessage[] {
+  return messages.map(m =>
+    m.role === "assistant" && m.result ? { ...m, result: remapCitations(m.result) } : m
+  );
 }
 
-interface Result {
-  session_id: string;
-  papers_used: number;
-  depth_reached: number;
-  mechanism: string;
-  intuition: string;
-  limitations: string;
-  open_questions: string;
-  evidence: EvidenceClaim[];
+// Split answer_paragraphs into atomic tokens so **bold** and [n] markers
+// are never split mid-token during fake streaming.
+function tokenise(paragraphs: string[]): string[] {
+  const tokens: string[] = [];
+  paragraphs.forEach((para, pi) => {
+    if (pi > 0) tokens.push("\n\n");
+    para.split(/(\[\d+\]|\*\*[^*]+\*\*)/g).forEach(seg => {
+      if (/^(\[\d+\]|\*\*[^*]+\*\*)$/.test(seg)) {
+        tokens.push(seg);
+      } else {
+        seg.split(/(\s+)/).forEach(w => { if (w) tokens.push(w); });
+      }
+    });
+  });
+  return tokens;
 }
 
-type Status = "idle" | "running" | "done" | "error";
-
-const HINTS = [
-  "explain how transformers work",
-  "contrast CNNs and RNNs",
-  "what are the limits of RLHF",
+const STAGE_MAP: [string, string][] = [
+  ["[Session]",          "Loading prior context"],
+  ["[Orchestrator]",     "Analyzing your question"],
+  ["[Planner]",          "Planning search strategy"],
+  ["[Retrieval]",        "Searching 200M+ papers"],
+  ["[Level",             "Deepening research"],
+  ["[Expansion]",        "Expanding into related concepts"],
+  ["[Coverage]",         "Checking coverage"],
+  ["[Compression]",      "Extracting key findings"],
+  ["[Synthesis] stream", "Drafting answer"],
+  ["[Synthesis]",        "Building evidence map"],
+  ["[Done]",             ""],
 ];
 
-function Section({ label, content }: { label: string; content: string }) {
-  return (
-    <div>
-      <hr className="rule" />
-      <div style={{ padding: "20px 0 4px", color: "var(--text-dim)", fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-        {label}
-      </div>
-      <p style={{ color: "var(--text)", whiteSpace: "pre-wrap" }}>{content}</p>
-    </div>
-  );
+function toStageLabel(event: string): string {
+  for (const [prefix, label] of STAGE_MAP) {
+    if (event.startsWith(prefix) || event.includes(prefix.slice(1, -1))) return label;
+  }
+  return "";
 }
 
-function EvidenceTable({ evidence }: { evidence: EvidenceClaim[] }) {
-  return (
-    <div>
-      <hr className="rule" />
-      <div style={{ padding: "20px 0 4px", color: "var(--text-dim)", fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-        Evidence
-      </div>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ color: "var(--text-dim)", fontSize: "11px" }}>
-            <th style={{ textAlign: "left", paddingBottom: "8px", fontWeight: "normal", width: "140px" }}>Paper ID</th>
-            <th style={{ textAlign: "left", paddingBottom: "8px", fontWeight: "normal", width: "220px" }}>Title</th>
-            <th style={{ textAlign: "left", paddingBottom: "8px", fontWeight: "normal" }}>Claim</th>
-          </tr>
-        </thead>
-        <tbody>
-          {evidence.map((claim, ci) =>
-            claim.papers.map((paper, pi) => (
-              <tr key={`${ci}-${pi}`} style={{ verticalAlign: "top" }}>
-                <td style={{ padding: "3px 16px 3px 0", color: "var(--text-dim)", whiteSpace: "nowrap" }}>
-                  <a
-                    href={`https://openalex.org/works/${paper.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ color: "var(--text-dim)", textDecoration: "underline", textDecorationColor: "var(--border)" }}
-                  >
-                    {paper.id.startsWith("arXiv:") ? paper.id.slice(6) : paper.id.slice(0, 12)}
-                  </a>
-                </td>
-                <td style={{ padding: "3px 16px 3px 0", color: "var(--text-dim)" }}>
-                  {paper.title.length > 40 ? paper.title.slice(0, 39) + "…" : paper.title}
-                </td>
-                <td style={{ padding: "3px 0", color: "var(--text)" }}>{pi === 0 ? claim.claim : ""}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
+function newConversation(): Conversation {
+  return {
+    id: crypto.randomUUID(),
+    title: "New inquiry",
+    createdAt: new Date().toISOString(),
+    depthReached: 0,
+    papersUsed: 0,
+    messages: [],
+  };
 }
 
 export default function Home() {
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<Status>("idle");
-  const [progress, setProgress] = useState<Progress[]>([]);
-  const [answer, setAnswer] = useState("");
-  const [result, setResult] = useState<Result | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const { data: session, status } = useSession();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [isFakeStreaming, setIsFakeStreaming] = useState(false);
+  const [fakeStreamText, setFakeStreamText] = useState("");
+  const [progressStage, setProgressStage] = useState("");
+  const [hoveredCite, setHoveredCite] = useState<number | null>(null);
+  const [depth, setDepth] = useState(1);
+  const [ready, setReady] = useState(false);
+  const [showLoader, setShowLoader] = useState(true);
+  const [loaderFading, setLoaderFading] = useState(false);
+  const mountTime = useRef(Date.now());
 
   useEffect(() => {
-    if (status === "running") {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!ready) return;
+    const elapsed = Date.now() - mountTime.current;
+    const remaining = Math.max(0, 750 - elapsed);
+    const fadeTimer = setTimeout(() => {
+      setLoaderFading(true);
+      setTimeout(() => setShowLoader(false), 350);
+    }, remaining);
+    return () => clearTimeout(fadeTimer);
+  }, [ready]);
+
+  const activeConv = conversations.find(c => c.id === activeId) ?? null;
+  const lastResult = activeConv?.messages.findLast(m => m.role === "assistant")?.result ?? null;
+
+  const citedPapers = lastResult?.papers ?? [];
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      fetch("/api/conversations")
+        .then(r => r.json())
+        .then(data => {
+          if (data.conversations?.length) {
+            const loaded: Conversation[] = data.conversations.map((c: { id: string; title: string; created_at: string; depth_reached: number; papers_used: number }) => ({
+              id: c.id,
+              title: c.title,
+              createdAt: c.created_at,
+              depthReached: c.depth_reached,
+              papersUsed: c.papers_used,
+              messages: [],
+            }));
+            setConversations(loaded);
+            setActiveId(loaded[0].id);
+            // Fetch the first conversation's messages immediately so content renders without a click
+            fetch(`/api/conversations/${loaded[0].id}`)
+              .then(r => r.json())
+              .then(msgData => {
+                setConversations(prev =>
+                  prev.map(c => c.id === loaded[0].id ? { ...c, messages: applyRemapToMessages(msgData.messages ?? []) } : c)
+                );
+              })
+              .catch(() => {});
+          } else {
+            const fresh = newConversation();
+            setConversations([fresh]);
+            setActiveId(fresh.id);
+          }
+          setReady(true);
+        })
+        .catch(() => {
+          const fresh = newConversation();
+          setConversations([fresh]);
+          setActiveId(fresh.id);
+          setReady(true);
+        });
+    } else if (status === "unauthenticated") {
+      const fresh = newConversation();
+      setConversations([fresh]);
+      setActiveId(fresh.id);
+      setReady(true);
     }
-  }, [answer, progress, status]);
+  }, [status]);
 
-  const lastProgress = progress[progress.length - 1] ?? "";
+  function handleNew() {
+    const conv = newConversation();
+    setConversations(prev => [conv, ...prev]);
+    setActiveId(conv.id);
+    setFakeStreamText("");
+  }
 
-  async function submit(q: string) {
-    if (!q.trim() || status === "running") return;
-    setStatus("running");
-    setProgress([]);
-    setAnswer("");
-    setResult(null);
-    setError(null);
+  async function handleDelete(id: string) {
+    setConversations(prev => prev.filter(c => c.id !== id));
+    if (activeId === id) {
+      const remaining = conversations.filter(c => c.id !== id);
+      setActiveId(remaining[0]?.id ?? null);
+    }
+    await fetch(`/api/conversations/${id}`, { method: "DELETE" }).catch(() => {});
+  }
+
+  async function handleSelect(id: string) {
+    setActiveId(id);
+    const existing = conversations.find(c => c.id === id);
+    if (existing && existing.messages.length === 0) {
+      try {
+        const res = await fetch(`/api/conversations/${id}`);
+        if (res.ok) {
+          const data = await res.json();
+          setConversations(prev =>
+            prev.map(c => c.id === id ? { ...c, messages: applyRemapToMessages(data.messages ?? []) } : c)
+          );
+        }
+      } catch {}
+    }
+  }
+
+  async function handleSubmit(query: string) {
+    if (!activeId || isStreaming) return;
+
+    const userMsg: ConversationMessage = { role: "user", query };
+    const assistantMsg: ConversationMessage = { role: "assistant", result: null };
+
+    setConversations(prev => prev.map(c =>
+      c.id === activeId
+        ? { ...c, title: c.messages.length === 0 ? query.slice(0, 60) : c.title, messages: [...c.messages, userMsg, assistantMsg] }
+        : c
+    ));
+
+    setIsStreaming(true);
+    setIsFakeStreaming(false);
+    setFakeStreamText("");
+    setProgressStage("");
+
+    const sessionId = activeConv?.sessionId;
 
     try {
-      const res = await fetch("/api/research", {
+      const userId = (session?.user as { id?: string })?.id;
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+      const res = await fetch(`${backendUrl}/research`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q, session_id: sessionId }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(userId ? { "X-User-Id": userId } : {}),
+        },
+        body: JSON.stringify({ query, session_id: sessionId }),
       });
 
       if (!res.ok || !res.body) throw new Error("Request failed");
@@ -126,6 +236,7 @@ export default function Home() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
+      let finalResult: ResearchResult | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -136,135 +247,133 @@ export default function Home() {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const msg = JSON.parse(line.slice(6));
-          if (msg.type === "progress") {
-            setProgress((p) => [...p, msg.data]);
-          } else if (msg.type === "token") {
-            setAnswer((a) => a + msg.data);
-          } else if (msg.type === "result") {
-            setResult(msg.data);
-            setSessionId(msg.data.session_id);
-            setStatus("done");
-          } else if (msg.type === "error") {
-            setError(msg.data);
-            setStatus("error");
+          if (msg.type === "progress") setProgressStage(toStageLabel(msg.data));
+          else if (msg.type === "result") finalResult = msg.data as ResearchResult;
+          else if (msg.type === "error") console.error("Research error:", msg.data);
+          // raw tokens intentionally ignored — we fake-stream from answer_paragraphs
+        }
+      }
+
+      if (finalResult) {
+        const fr = remapCitations(finalResult);
+        setIsStreaming(false);
+
+        // Commit full result immediately (evidence panel populates)
+        setConversations(prev => prev.map(c => {
+          if (c.id !== activeId) return c;
+          const msgs = [...c.messages];
+          msgs[msgs.length - 1] = { role: "assistant", result: fr };
+          return { ...c, depthReached: fr.depth_reached, papersUsed: fr.papers_used, sessionId: fr.session_id, messages: msgs };
+        }));
+
+        // Fake-stream the formatted answer
+        const tokens = tokenise(fr.answer_paragraphs);
+        setIsFakeStreaming(true);
+        setFakeStreamText("");
+        let revealed = "";
+        let i = 0;
+        const tick = setInterval(() => {
+          if (i >= tokens.length) {
+            clearInterval(tick);
+            setIsFakeStreaming(false);
+            return;
+          }
+          revealed += tokens[i++];
+          setFakeStreamText(revealed);
+        }, 22);
+
+        if (status === "authenticated") {
+          const conv = conversations.find(c => c.id === activeId);
+          if (conv) {
+            fetch("/api/conversations", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: conv.messages.length === 0 ? query.slice(0, 60) : conv.title,
+                depthReached: fr.depth_reached,
+                papersUsed: fr.papers_used,
+                messages: [userMsg, { role: "assistant", result: fr }],
+              }),
+            }).catch(() => {});
           }
         }
       }
     } catch (e) {
-      setError(String(e));
-      setStatus("error");
+      console.error(e);
+      setIsStreaming(false);
     }
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    submit(query);
-    setQuery("");
+  function handleCiteClick(n: number) {
+    document.getElementById(`source-${n}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  const isRunning = status === "running";
-  const hasOutput = answer || result || error;
+  function handleExportBibtex() {
+    if (lastResult?.papers?.length) downloadBibtex(lastResult.papers);
+  }
+
+  async function handleShare() {
+    if (!activeId) return;
+    try {
+      const res = await fetch(`/api/conversations/${activeId}/share`, { method: "POST" });
+      if (res.ok) {
+        const { token } = await res.json();
+        await navigator.clipboard.writeText(`${window.location.origin}/share/${token}`);
+        alert("Share link copied to clipboard");
+      }
+    } catch {}
+  }
+
+  const showAuthGate = status === "unauthenticated";
 
   return (
-    <main style={{ maxWidth: "780px", margin: "0 auto", padding: "80px 24px 120px" }}>
+    <div className="app">
+      {showAuthGate && <AuthGate onAuthenticated={() => {}} />}
 
-      {/* Logo */}
-      <div style={{ textAlign: "center", marginBottom: "48px" }}>
-        <pre style={{ display: "inline-block", textAlign: "left", lineHeight: 1.2, color: "var(--text)", fontSize: "13px" }}>{`   _____      __          __
-  / ___/_____/ /_  ____  / /____
-  \\__ \\/ ___/ __ \\/ __ \\/ / ___/
- ___/ / /__/ / / / /_/ / / /
-/____/\\___/_/ /_/\\____/_/_/`}</pre>
-        <div style={{ marginTop: "12px", color: "var(--text-dim)", fontSize: "12px" }}>
-          autonomous AI research agent · 200M+ papers
-        </div>
-      </div>
+      <Sidebar conversations={conversations} activeId={activeId} onSelect={handleSelect} onNew={handleNew} onDelete={handleDelete} />
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} style={{ marginBottom: "40px" }}>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <span style={{ color: "var(--text-dim)" }}>{">"}</span>
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={HINTS[0]}
-            disabled={isRunning}
-            autoFocus
-            style={{
-              flex: 1,
-              background: "transparent",
-              border: "none",
-              outline: "none",
-              color: "var(--text)",
-              fontFamily: "inherit",
-              fontSize: "inherit",
-              opacity: isRunning ? 0.4 : 1,
-            }}
-          />
-          {isRunning && (
-            <span style={{ color: "var(--text-dim)", fontSize: "11px" }}>{lastProgress.split("]")[0]?.replace("[", "") ?? "…"}</span>
-          )}
-        </div>
-        <hr className="rule" style={{ marginTop: "8px" }} />
-        {status === "idle" && (
-          <div style={{ marginTop: "8px", color: "var(--text-dim)", fontSize: "11px" }}>
-            {HINTS.slice(1).map((h) => (
-              <span key={h} style={{ marginRight: "24px", cursor: "pointer" }} onClick={() => { setQuery(h); inputRef.current?.focus(); }}>
-                {h}
-              </span>
-            ))}
+      <div className="app__center">
+        {showLoader ? (
+          <div className={`pane-loader${loaderFading ? " pane-loader--out" : ""}`}>
+            <div className="pane-loader__logo">S</div>
+            <div className="pane-loader__dots">
+              <div className="pane-loader__dot" />
+              <div className="pane-loader__dot" />
+              <div className="pane-loader__dot" />
+            </div>
+          </div>
+        ) : activeConv ? (
+          <div className="pane-content-in" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <Thread
+              messages={activeConv.messages}
+              fakeStreamText={fakeStreamText}
+              isFakeStreaming={isFakeStreaming}
+              isStreaming={isStreaming}
+              progressStage={progressStage}
+              hoveredCite={hoveredCite}
+              onHover={setHoveredCite}
+              onCiteClick={handleCiteClick}
+              onFollowUp={handleSubmit}
+              onExportBibtex={handleExportBibtex}
+              onShare={handleShare}
+              title={activeConv.title}
+              sessionId={activeConv.sessionId}
+            />
+            <Composer onSubmit={handleSubmit} disabled={isStreaming} depth={depth} onDepthChange={setDepth} />
+          </div>
+        ) : (
+          <div className="app__empty pane-content-in">
+            Select or start a new inquiry
           </div>
         )}
-      </form>
+      </div>
 
-      {/* Output */}
-      {hasOutput && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-
-          {/* Answer */}
-          {(answer || isRunning) && (
-            <div>
-              <hr className="rule" />
-              <div style={{ padding: "20px 0 4px", color: "var(--text-dim)", fontSize: "11px", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                Answer
-              </div>
-              <p style={{ whiteSpace: "pre-wrap" }} className={isRunning && !result ? "cursor" : ""}>
-                {answer}
-              </p>
-            </div>
-          )}
-
-          {/* Sections */}
-          {result && (
-            <>
-              <Section label="Mechanism" content={result.mechanism} />
-              <Section label="Intuition" content={result.intuition} />
-              <Section label="Limitations" content={result.limitations} />
-              <Section label="Open Questions" content={result.open_questions} />
-              <EvidenceTable evidence={result.evidence} />
-
-              <div style={{ textAlign: "center", color: "var(--text-dim)", fontSize: "11px", paddingTop: "8px" }}>
-                <hr className="rule" style={{ marginBottom: "16px" }} />
-                <span style={{ color: "var(--text)" }}>{result.papers_used} papers</span>
-                <span style={{ margin: "0 12px" }}>·</span>
-                <span style={{ color: "var(--text)" }}>depth {result.depth_reached}</span>
-                <span style={{ margin: "0 12px" }}>·</span>
-                <span>session {result.session_id.slice(0, 8)}</span>
-              </div>
-            </>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div style={{ color: "var(--text-dim)", padding: "16px 0" }}>
-              {error}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div ref={bottomRef} />
-    </main>
+      <EvidencePanel
+        papers={citedPapers}
+        depth={lastResult?.depth_reached ?? 0}
+        hoveredCite={hoveredCite}
+        onHover={setHoveredCite}
+      />
+    </div>
   );
 }

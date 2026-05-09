@@ -64,6 +64,19 @@ async def test_stream_answer_calls_on_token_and_returns_full_text(mocker):
     assert tokens == ["The ", "Transformer ", "uses ", "self-attention."]
 
 
+async def test_synthesize_returns_answer_paragraphs(mocker, sample_synthesis):
+    mocker.patch("scholr.synthesis.llm_parse", new_callable=AsyncMock, return_value=sample_synthesis)
+    result = await synthesize(_make_state(), lambda _: None)
+    assert isinstance(result.answer_paragraphs, list)
+
+
+async def test_synthesize_returns_follow_up_questions(mocker, sample_synthesis):
+    mocker.patch("scholr.synthesis.llm_parse", new_callable=AsyncMock, return_value=sample_synthesis)
+    result = await synthesize(_make_state(), lambda _: None)
+    assert isinstance(result.follow_up_questions, list)
+    assert len(result.follow_up_questions) == 3
+
+
 async def test_stream_answer_skips_empty_deltas(mocker):
     async def fake_stream():
         for content in ["hello", None, "", " world"]:

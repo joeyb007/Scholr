@@ -1,8 +1,12 @@
 import asyncio
 import json
+import time
 from uuid import uuid4
+from dotenv import load_dotenv
 
-from fastapi import FastAPI
+load_dotenv()
+
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -16,8 +20,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["POST", "GET", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["*", "X-User-Id"],
 )
+
+# In-memory rate limit: user_id -> last_query_timestamp
+_rate: dict[str, float] = {}
+_RATE_LIMIT_SECONDS = 90
 
 
 class ResearchRequest(BaseModel):
@@ -29,8 +37,48 @@ def _sse(type: str, data) -> str:
     return f"data: {json.dumps({'type': type, 'data': data})}\n\n"
 
 
+def _build_result(result: ResearchState) -> dict:
+    out = result.final_output
+    papers = [
+        {
+            "id": p.paper_id,
+            "n": i + 1,
+            "title": p.title,
+            "authors": p.authors,
+            "year": p.year,
+            "venue": p.venue,
+            "claim": next(
+                (c.claim for c in out.evidence_map if p.paper_id in c.paper_ids),
+                "",
+            ),
+        }
+        for i, p in enumerate(result.papers)
+    ]
+
+    return {
+        "session_id": result.session_id,
+        "papers_used": out.papers_used,
+        "depth_reached": result.depth_reached,
+        "answer_paragraphs": out.answer_paragraphs,
+        "mechanism": out.mechanism,
+        "intuition": out.intuition,
+        "limitations": out.limitations,
+        "open_questions": out.open_questions,
+        "follow_up_questions": out.follow_up_questions,
+        "papers": papers,
+    }
+
+
 @app.post("/research")
-async def research(body: ResearchRequest):
+async def research(body: ResearchRequest, request: Request):
+    user_id = request.headers.get("X-User-Id", "anonymous")
+    now = time.time()
+    last = _rate.get(user_id, 0)
+    if user_id != "anonymous" and (now - last) < _RATE_LIMIT_SECONDS:
+        wait = int(_RATE_LIMIT_SECONDS - (now - last))
+        raise HTTPException(status_code=429, detail=f"Rate limit: wait {wait}s")
+    _rate[user_id] = now
+
     queue: asyncio.Queue[str | None] = asyncio.Queue()
     session_id = body.session_id or str(uuid4())
 
@@ -51,28 +99,7 @@ async def research(body: ResearchRequest):
             if isinstance(result, str):
                 queue.put_nowait(_sse("error", result))
             else:
-                out = result.final_output
-                paper_by_id = {p.paper_id: p for p in result.papers}
-                evidence = [
-                    {
-                        "claim": claim.claim,
-                        "papers": [
-                            {"id": pid, "title": paper_by_id[pid].title if pid in paper_by_id else pid}
-                            for pid in claim.paper_ids
-                        ],
-                    }
-                    for claim in out.evidence_map
-                ]
-                queue.put_nowait(_sse("result", {
-                    "session_id": result.session_id,
-                    "papers_used": out.papers_used,
-                    "depth_reached": result.depth_reached,
-                    "mechanism": out.mechanism,
-                    "intuition": out.intuition,
-                    "limitations": out.limitations,
-                    "open_questions": out.open_questions,
-                    "evidence": evidence,
-                }))
+                queue.put_nowait(_sse("result", _build_result(result)))
         except Exception as e:
             queue.put_nowait(_sse("error", str(e)))
         finally:

@@ -11,6 +11,9 @@ def sample_paper() -> Paper:
         title="Attention Is All You Need",
         abstract="We propose the Transformer, a model architecture eschewing recurrence.",
         source_query="transformer attention mechanism",
+        authors="Vaswani, A., Shazeer, N., Parmar, N. et al.",
+        year=2017,
+        venue="Advances in Neural Information Processing Systems",
     )
 
 
@@ -40,4 +43,10 @@ def sample_synthesis() -> SynthesisResult:
         ],
         papers_used=1,
         depth_reached=0,
+        answer_paragraphs=["Transformers use self-attention [1] to process sequences in parallel."],
+        follow_up_questions=[
+            "How does positional encoding work in transformers?",
+            "What are the memory requirements of multi-head attention?",
+            "How do vision transformers differ from language transformers?",
+        ],
     )

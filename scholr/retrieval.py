@@ -60,7 +60,7 @@ async def _fetch_openalex(query: str, max_results: int) -> list[Paper]:
             params={
                 "search": query,
                 "per-page": max_results,
-                "select": "id,title,abstract_inverted_index,ids",
+                "select": "id,title,abstract_inverted_index,ids,authorships,publication_year,primary_location",
                 "mailto": _MAILTO,
             },
         )
@@ -91,10 +91,27 @@ def _parse_works(data: list[dict], query: str) -> list[Paper]:
         arxiv_url = ids.get("arxiv", "")
         arxiv_id = arxiv_url.split("abs/")[-1].rstrip("/") if arxiv_url else ""
         paper_id = f"arXiv:{arxiv_id}" if arxiv_id else item["id"].split("/")[-1]
+
+        raw_authors = [
+            a.get("author", {}).get("display_name", "")
+            for a in (item.get("authorships") or [])[:3]
+        ]
+        authors = ", ".join(a for a in raw_authors if a)
+        if len(item.get("authorships") or []) > 3:
+            authors += " et al."
+
+        venue = (
+            ((item.get("primary_location") or {}).get("source") or {})
+            .get("display_name", "") or ""
+        )
+
         papers.append(Paper(
             paper_id=paper_id,
             title=item.get("title") or "Untitled",
             abstract=abstract,
             source_query=query,
+            authors=authors,
+            year=item.get("publication_year"),
+            venue=venue,
         ))
     return papers
