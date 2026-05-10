@@ -2,7 +2,7 @@ import os
 from pydantic import BaseModel
 from openai import AsyncOpenAI, AuthenticationError
 
-MODEL = "gpt-4o"
+MODEL = "gpt-4o-mini"
 client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY", "test-key-for-unit-tests"))
 
 
