@@ -21,7 +21,7 @@ async def run_pipeline(
     k: int = 8,
     year_from: int | None = None,
 ) -> ResearchState:
-    state = load_session(session_id) or fresh_state(query, session_id)
+    state = await load_session(session_id) or fresh_state(query, session_id)
     state.query = query  # always use the current query for planning and synthesis
     on_event("[Session] loading context")
 
@@ -78,7 +78,7 @@ async def run_pipeline(
         )
 
     _validate_evidence(state)
-    save_session(state)
+    await save_session(state)
     on_event("[Done]")
     return state
 

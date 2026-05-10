@@ -45,7 +45,7 @@ async def run_research(
     year_from: int | None = None,
 ) -> ResearchState | str:
     """Returns ResearchState on success, or a str suggestion if query is too complex."""
-    prior = load_session(session_id)
+    prior = await load_session(session_id)
     session_context = ""
     if prior and prior.concept_to_papers:
         concepts = list(prior.concept_to_papers.keys())[:12]
@@ -165,6 +165,6 @@ async def _compare_synthesize(
 
     state.final_output = result
     _validate_evidence(state)
-    save_session(state)
+    await save_session(state)
     on_event("[Done]")
     return state

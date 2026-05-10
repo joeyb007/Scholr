@@ -1,12 +1,12 @@
 import asyncio
 import json
-import time
+import os
 from uuid import uuid4
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -16,16 +16,13 @@ from scholr.state import ResearchState
 
 app = FastAPI()
 
+_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins,
     allow_methods=["POST", "GET", "OPTIONS"],
     allow_headers=["*", "X-User-Id"],
 )
-
-# In-memory rate limit: user_id -> last_query_timestamp
-_rate: dict[str, float] = {}
-_RATE_LIMIT_SECONDS = 10
 
 
 class ResearchRequest(BaseModel):
@@ -72,15 +69,7 @@ def _build_result(result: ResearchState) -> dict:
 
 
 @app.post("/research")
-async def research(body: ResearchRequest, request: Request):
-    user_id = request.headers.get("X-User-Id", "anonymous")
-    now = time.time()
-    last = _rate.get(user_id, 0)
-    if user_id != "anonymous" and (now - last) < _RATE_LIMIT_SECONDS:
-        wait = int(_RATE_LIMIT_SECONDS - (now - last))
-        raise HTTPException(status_code=429, detail=f"Rate limit: wait {wait}s")
-    _rate[user_id] = now
-
+async def research(body: ResearchRequest):
     queue: asyncio.Queue[str | None] = asyncio.Queue()
     session_id = body.session_id or str(uuid4())
 
