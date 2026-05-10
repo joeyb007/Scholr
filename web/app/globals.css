@@ -234,6 +234,21 @@ input { font: inherit; color: inherit; background: transparent; border: none; ou
 .cite-modal__hint { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 8px; text-align: right; }
 .cite-modal__hint--copied { color: var(--amber); }
 
+/* ─── upgrade modal ──────────────────────────────────────── */
+.upgrade-box { width: 360px; text-align: center; }
+.upgrade__logo { width: 40px; height: 40px; border-radius: 10px; margin: 0 auto 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.upgrade__logo img, .upgrade__logo { background: var(--amber); font-family: var(--serif); font-size: 22px; font-weight: 700; color: #16130f; }
+.upgrade__title { font-family: var(--serif); font-size: 17px; color: var(--fg); margin-bottom: 10px; line-height: 1.3; }
+.upgrade__body { font-family: var(--mono); font-size: 11px; color: var(--dim); line-height: 1.6; margin-bottom: 20px; }
+.upgrade__form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.upgrade__input { width: 100%; padding: 10px 12px; border: 1px solid var(--border-s); border-radius: 4px; font-family: var(--serif); font-size: 14px; color: var(--fg); background: var(--raised); }
+.upgrade__input:focus { border-color: var(--amber); outline: none; }
+.upgrade__submit { width: 100%; padding: 10px 0; background: var(--amber); color: #16130f; border-radius: 4px; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
+.upgrade__submit:hover { background: #f0b840; }
+.upgrade__success { font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--amber); margin-bottom: 16px; }
+.upgrade__dismiss { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 4px; }
+.upgrade__dismiss:hover { color: var(--dim); }
+
 /* ─── auth gate ──────────────────────────────────────────── */
 .gate { position: fixed; inset: 0; background: rgba(22,19,15,0.88); display: flex; align-items: center; justify-content: center; z-index: 50; backdrop-filter: blur(4px); }
 .gate__box { width: 360px; background: var(--panel); border: 1px solid var(--border-s); border-radius: 8px; padding: 32px; }

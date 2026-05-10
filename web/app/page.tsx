@@ -8,6 +8,7 @@ import { Thread } from "@/components/Thread";
 import { EvidencePanel } from "@/components/EvidencePanel";
 import { Composer } from "@/components/Composer";
 import { AuthGate } from "@/components/AuthGate";
+import { UpgradeModal } from "@/components/UpgradeModal";
 import { downloadBibtex } from "@/lib/bibtex";
 
 // Renumber citations to sequential 1-based order of first appearance.
@@ -110,6 +111,7 @@ export default function Home() {
   const [depth, setDepth] = useState(1);
   const [yearFrom, setYearFrom] = useState<number | null>(null);
   const [k, setK] = useState(8);
+  const [upgradeInfo, setUpgradeInfo] = useState<{ used: number; limit: number } | null>(null);
   const [ready, setReady] = useState(false);
   const [showLoader, setShowLoader] = useState(true);
   const [loaderFading, setLoaderFading] = useState(false);
@@ -214,6 +216,19 @@ export default function Home() {
     if (!activeId || isStreaming) return;
 
     const isFirstQuery = (activeConv?.messages.length ?? 0) === 0;
+
+    if (status === "authenticated") {
+      const limitRes = await fetch("/api/query-limit", { method: "POST" });
+      if (!limitRes.ok) {
+        const data = await limitRes.json();
+        setConversations(prev => prev.map(c =>
+          c.id === activeId ? { ...c, messages: c.messages.slice(0, -2) } : c
+        ));
+        setIsStreaming(false);
+        setUpgradeInfo({ used: data.used ?? 10, limit: data.limit ?? 10 });
+        return;
+      }
+    }
     const userMsg: ConversationMessage = { role: "user", query };
     const assistantMsg: ConversationMessage = { role: "assistant", result: null };
 
@@ -393,6 +408,7 @@ export default function Home() {
   return (
     <div className="app">
       {showAuthGate && <AuthGate onAuthenticated={() => {}} />}
+      {upgradeInfo && <UpgradeModal used={upgradeInfo.used} limit={upgradeInfo.limit} onClose={() => setUpgradeInfo(null)} />}
 
       <Sidebar conversations={conversations} activeId={activeId} onSelect={handleSelect} onNew={handleNew} onDelete={handleDelete} />
 
