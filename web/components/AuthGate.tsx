@@ -48,11 +48,37 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
 
   return (
     <div className="gate">
-      <div className="gate__box">
-        <div className="gate__title">
-          {mode === "signin" ? "Sign in to Scholr" : "Create account"}
+      <div className="gate__hero">
+        <img src="/scholr.png" className="gate__hero-logo" alt="Scholr" />
+        <div className="gate__headline">Research that cites its sources.</div>
+        <div className="gate__pitch">
+          Ask any research question. Scholr searches 200M+ academic papers and returns a structured answer where every claim links back to a real paper you can verify.
         </div>
-        <div className="gate__sub">Research 200M+ academic papers</div>
+        <div className="gate__features">
+          <div className="gate__feature">
+            <div className="gate__feature-dot" />
+            <div className="gate__feature-text">Searches OpenAlex's 200M+ paper corpus — no paywalls, no hallucinations</div>
+          </div>
+          <div className="gate__feature">
+            <div className="gate__feature-dot" />
+            <div className="gate__feature-text">Every claim is inline-cited and linked to the source paper</div>
+          </div>
+          <div className="gate__feature">
+            <div className="gate__feature-dot" />
+            <div className="gate__feature-text">Follow-up questions build on prior context — like a research session, not a search</div>
+          </div>
+          <div className="gate__feature">
+            <div className="gate__feature-dot" />
+            <div className="gate__feature-text">Export citations as BibTeX with one click</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="gate__panel">
+        <div className="gate__title">
+          {mode === "signin" ? "Sign in" : "Create account"}
+        </div>
+        <div className="gate__sub">10 free queries per day during beta</div>
 
         <button className="gate__google" onClick={handleGoogle}>
           Continue with Google
