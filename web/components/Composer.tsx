@@ -97,9 +97,14 @@ export function Composer({ onSubmit, disabled, depth, onDepthChange, yearFrom, o
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" && !e.shiftKey && text.trim()) {
       e.preventDefault();
-      onSubmit(text.trim());
-      setText("");
+      handleSubmit();
     }
+  }
+
+  function handleSubmit() {
+    if (!text.trim() || disabled) return;
+    onSubmit(text.trim());
+    setText("");
   }
 
   const depthLabel = `depth ${depth}`;
@@ -164,7 +169,10 @@ export function Composer({ onSubmit, disabled, depth, onDepthChange, yearFrom, o
             onChange={v => onKChange(v ?? 8)}
             active={k !== 8}
           />
-          <span className="composer__send">↵ send</span>
+          <button
+            className={`composer__send${text.trim() && !disabled ? " composer__send--active" : ""}`}
+            onMouseDown={e => { e.preventDefault(); handleSubmit(); }}
+          >↵ send</button>
         </div>
       </div>
     </div>

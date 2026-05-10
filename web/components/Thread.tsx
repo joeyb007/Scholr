@@ -95,6 +95,9 @@ const ORDERED_STAGES = [
 ];
 
 function stageProgress(stage: string): number {
+  // Parallel fan-out: "Researching CNNs · RNNs"
+  if (stage.includes(" · ")) return 30;
+  // Sequential thread: "Researching X (N/M)"
   const threadMatch = stage.match(/Researching .+ \((\d+)\/(\d+)\)/);
   if (threadMatch) {
     const n = parseInt(threadMatch[1]), total = parseInt(threadMatch[2]);
@@ -205,7 +208,7 @@ export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming,
               {showProgress && (
                 <div className="progress">
                   <div className="progress__bar-track">
-                    <div className="progress__bar-fill" style={{ width: `${stageProgress(progressStage)}%` }} />
+                    <div className={`progress__bar-fill${progressStage.includes(" · ") ? " progress__bar-fill--pulse" : ""}`} style={{ width: `${stageProgress(progressStage)}%` }} />
                   </div>
                   <div className="progress__stage">
                     <div className="progress__dot" />

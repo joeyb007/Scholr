@@ -263,6 +263,8 @@ export default function Home() {
       let finalResult: ResearchResult | null = null;
       let errorMsg: string | null = null;
       let suggestionMsg: string | null = null;
+      let parallelTopics: string[] = [];
+      let parallelTotal = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -273,7 +275,19 @@ export default function Home() {
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
           const msg = JSON.parse(line.slice(6));
-          if (msg.type === "progress") { const l = toStageLabel(msg.data); if (l) setProgressStage(l); }
+          if (msg.type === "progress") {
+            const event = msg.data as string;
+            const parallelStart = event.match(/\[Orchestrator\] running (\d+) research threads in parallel/);
+            if (parallelStart) { parallelTopics = []; parallelTotal = parseInt(parallelStart[1]); continue; }
+            const threadMatch = event.match(/\[Orchestrator\] thread \d+\/\d+: (.+)/);
+            if (threadMatch && parallelTotal > 1) {
+              parallelTopics.push(threadMatch[1]);
+              setProgressStage(`Researching ${parallelTopics.join(" · ")}`);
+              continue;
+            }
+            const l = toStageLabel(event);
+            if (l) setProgressStage(l);
+          }
           else if (msg.type === "result") finalResult = msg.data as ResearchResult;
           else if (msg.type === "suggestion") suggestionMsg = msg.data as string;
           else if (msg.type === "error") errorMsg = msg.data as string;

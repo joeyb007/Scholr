@@ -155,6 +155,8 @@ input { font: inherit; color: inherit; background: transparent; border: none; ou
 .progress { margin-bottom: 32px; }
 .progress__bar-track { height: 1px; background: var(--border); border-radius: 1px; margin-bottom: 16px; overflow: hidden; }
 .progress__bar-fill { height: 100%; background: var(--amber); border-radius: 1px; transition: width 0.6s ease; }
+.progress__bar-fill--pulse { animation: bar-pulse 1.4s ease-in-out infinite; }
+@keyframes bar-pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
 .progress__stage { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11px; color: var(--dim); }
 .progress__dot { width: 5px; height: 5px; border-radius: 50%; background: var(--amber); flex-shrink: 0; animation: pulse 1.4s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
@@ -175,7 +177,8 @@ input { font: inherit; color: inherit; background: transparent; border: none; ou
 .composer__params-label { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); white-space: nowrap; margin-right: 2px; }
 .composer__chip { padding: 3px 8px; border: 1px solid var(--amber); border-radius: 3px; font-family: var(--mono); font-size: 10.5px; color: var(--amber); letter-spacing: 0.04em; }
 .composer__chip:hover { border-color: var(--border-s); color: var(--dim); }
-.composer__send { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
+.composer__send { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--faint); transition: color 0.15s; }
+.composer__send--active { color: var(--amber); }
 
 /* ─── chip popover ───────────────────────────────────────── */
 @keyframes pop-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
