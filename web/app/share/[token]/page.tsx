@@ -18,7 +18,7 @@ async function getSharedConversation(token: string): Promise<Conversation | null
       createdAt: conv.created_at,
       depthReached: conv.depth_reached,
       papersUsed: conv.papers_used,
-      messages: messages.map((m: { content: unknown }) => m.content),
+      messages: messages.map((m: { content: unknown }) => m.content as ConversationMessage),
     };
   } catch {
     return null;
