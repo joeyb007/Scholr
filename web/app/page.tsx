@@ -392,7 +392,10 @@ export default function Home() {
   }
 
   function handleCiteClick(n: number) {
-    document.getElementById(`source-${n}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setMobileEvidenceOpen(true);
+    setTimeout(() => {
+      document.getElementById(`source-${n}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 280);
   }
 
   function handleExportBibtex() {
