@@ -1,18 +1,24 @@
 import type { Conversation, ConversationMessage } from "@/types/scholr";
+import { pool } from "@/lib/db";
 
 async function getSharedConversation(token: string): Promise<Conversation | null> {
-  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3002";
   try {
-    const res = await fetch(`${baseUrl}/api/share/${token}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const data = await res.json();
+    const { rows: [conv] } = await pool.query(
+      "SELECT * FROM conversations WHERE share_token = $1",
+      [token]
+    );
+    if (!conv) return null;
+    const { rows: messages } = await pool.query(
+      "SELECT role, content FROM messages WHERE conversation_id = $1 ORDER BY created_at",
+      [conv.id]
+    );
     return {
-      id: data.id,
-      title: data.title,
-      createdAt: data.created_at,
-      depthReached: data.depth_reached,
-      papersUsed: data.papers_used,
-      messages: data.messages ?? [],
+      id: conv.id,
+      title: conv.title,
+      createdAt: conv.created_at,
+      depthReached: conv.depth_reached,
+      papersUsed: conv.papers_used,
+      messages: messages.map((m: { content: unknown }) => m.content),
     };
   } catch {
     return null;

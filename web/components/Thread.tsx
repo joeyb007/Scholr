@@ -151,8 +151,8 @@ export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming,
           )}
         </div>
         <div className="topbar__actions">
-          <button className="topbar__action topbar__action--desktop" onClick={onExportBibtex}>↗ EXPORT BIBTEX</button>
-          <button className="topbar__action topbar__action--desktop" onClick={onShare}>⤴ SHARE</button>
+          <button className="topbar__action topbar__action--desktop" onClick={onExportBibtex}>↗<span className="topbar__action-text"> EXPORT BIBTEX</span></button>
+          <button className="topbar__action topbar__action--desktop" onClick={onShare}>⤴<span className="topbar__action-text"> SHARE</span></button>
           <span className="topbar__grounded">● GROUNDED</span>
           {onMobileSources && (
             <button className="topbar__sources" onClick={onMobileSources}>
