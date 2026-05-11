@@ -8,11 +8,16 @@ interface EvidencePanelProps {
   depth: number;
   hoveredCite: number | null;
   onHover: (n: number | null) => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export function EvidencePanel({ papers, depth, hoveredCite, onHover }: EvidencePanelProps) {
+export function EvidencePanel({ papers, depth, hoveredCite, onHover, mobileOpen, onMobileClose }: EvidencePanelProps) {
   return (
-    <div className="evidence">
+    <div className={`evidence${mobileOpen ? " evidence--mobile-open" : ""}`}>
+      {onMobileClose && (
+        <button className="evidence__mobile-close" onClick={onMobileClose}>✕ close</button>
+      )}
       <div className="evidence__header">
         <div className="evidence__title-row">
           <span className="evidence__title">Evidence</span>

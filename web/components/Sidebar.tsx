@@ -10,6 +10,8 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 function timeAgo(dateStr: string): string {
@@ -60,7 +62,7 @@ function ConfirmModal({ title, onConfirm, onCancel }: ConfirmModalProps) {
   );
 }
 
-export function Sidebar({ conversations, activeId, onSelect, onNew, onDelete }: SidebarProps) {
+export function Sidebar({ conversations, activeId, onSelect, onNew, onDelete, mobileOpen, onMobileClose }: SidebarProps) {
   const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
   const { status } = useSession();
 
@@ -86,7 +88,10 @@ export function Sidebar({ conversations, activeId, onSelect, onNew, onDelete }: 
         />
       )}
 
-      <div className="sidebar">
+      <div className={`sidebar${mobileOpen ? " sidebar--mobile-open" : ""}`}>
+        {onMobileClose && (
+          <button className="sidebar__mobile-close" onClick={onMobileClose}>✕</button>
+        )}
         <div className="sidebar__brand">
           <div className="sidebar__brand-row">
             <img src="/scholr.png" className="sidebar__logo" alt="Scholr" />
@@ -137,3 +142,4 @@ export function Sidebar({ conversations, activeId, onSelect, onNew, onDelete }: 
     </>
   );
 }
+

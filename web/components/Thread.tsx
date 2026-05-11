@@ -122,9 +122,12 @@ interface ThreadProps {
   onShare: () => void;
   title: string;
   sessionId?: string;
+  onMobileMenu?: () => void;
+  onMobileSources?: () => void;
+  sourcesCount?: number;
 }
 
-export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming, progressStage, hoveredCite, onHover, onCiteClick, onFollowUp, onExportBibtex, onShare, title, sessionId }: ThreadProps) {
+export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming, progressStage, hoveredCite, onHover, onCiteClick, onFollowUp, onExportBibtex, onShare, title, sessionId, onMobileMenu, onMobileSources, sourcesCount }: ThreadProps) {
   const [expandedPriors, setExpandedPriors] = useState<Set<number>>(new Set());
 
   function togglePrior(i: number) {
@@ -139,15 +142,23 @@ export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming,
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div className="topbar">
         <div className="topbar__left">
+          {onMobileMenu && (
+            <button className="topbar__hamburger" onClick={onMobileMenu}>≡</button>
+          )}
           <span className="topbar__title">{title || "New inquiry"}</span>
           {sessionId && (
             <span className="topbar__session">SESSION · {sessionId.slice(0, 8)}</span>
           )}
         </div>
         <div className="topbar__actions">
-          <button className="topbar__action" onClick={onExportBibtex}>↗ EXPORT BIBTEX</button>
-          <button className="topbar__action" onClick={onShare}>⤴ SHARE</button>
+          <button className="topbar__action topbar__action--desktop" onClick={onExportBibtex}>↗ EXPORT BIBTEX</button>
+          <button className="topbar__action topbar__action--desktop" onClick={onShare}>⤴ SHARE</button>
           <span className="topbar__grounded">● GROUNDED</span>
+          {onMobileSources && (
+            <button className="topbar__sources" onClick={onMobileSources}>
+              sources{sourcesCount ? ` (${sourcesCount})` : ""}
+            </button>
+          )}
         </div>
       </div>
 

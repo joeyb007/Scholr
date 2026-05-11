@@ -112,14 +112,19 @@ export default function Home() {
   const [yearFrom, setYearFrom] = useState<number | null>(null);
   const [k, setK] = useState(8);
   const [upgradeInfo, setUpgradeInfo] = useState<{ used: number; limit: number } | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileEvidenceOpen, setMobileEvidenceOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const [showLoader, setShowLoader] = useState(true);
   const [loaderFading, setLoaderFading] = useState(false);
-  const mountTime = useRef(Date.now());
+  const mountTime = useRef(0);
+  const [streamingConvId, setStreamingConvId] = useState<string | null>(null);
+
+  useEffect(() => { mountTime.current = Date.now(); }, []);
 
   useEffect(() => {
     if (!ready) return;
-    const elapsed = Date.now() - mountTime.current;
+    const elapsed = Date.now() - (mountTime.current || Date.now());
     const remaining = Math.max(0, 750 - elapsed);
     const fadeTimer = setTimeout(() => {
       setLoaderFading(true);
@@ -238,6 +243,7 @@ export default function Home() {
         : c
     ));
 
+    setStreamingConvId(activeId);
     setIsStreaming(true);
     setIsFakeStreaming(false);
     setFakeStreamText("");
@@ -311,6 +317,7 @@ export default function Home() {
 
       if (suggestionMsg || errorMsg) {
         setIsStreaming(false);
+        setStreamingConvId(null);
         setProgressStage("");
         const payload = suggestionMsg
           ? { role: "assistant" as const, result: null, suggestion: suggestionMsg }
@@ -345,6 +352,7 @@ export default function Home() {
           if (i >= tokens.length) {
             clearInterval(tick);
             setIsFakeStreaming(false);
+            setStreamingConvId(null);
             return;
           }
           revealed += tokens[i++];
@@ -409,8 +417,10 @@ export default function Home() {
     <div className="app">
       {showAuthGate && <AuthGate onAuthenticated={() => {}} />}
       {upgradeInfo && <UpgradeModal used={upgradeInfo.used} limit={upgradeInfo.limit} onClose={() => setUpgradeInfo(null)} />}
+      {mobileSidebarOpen && <div className="mobile-overlay" onClick={() => setMobileSidebarOpen(false)} />}
+      {mobileEvidenceOpen && <div className="mobile-overlay" onClick={() => setMobileEvidenceOpen(false)} />}
 
-      <Sidebar conversations={conversations} activeId={activeId} onSelect={handleSelect} onNew={handleNew} onDelete={handleDelete} />
+      <Sidebar conversations={conversations} activeId={activeId} onSelect={id => { handleSelect(id); setMobileSidebarOpen(false); }} onNew={handleNew} onDelete={handleDelete} mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />
 
       <div className="app__center">
         {showLoader ? (
@@ -427,8 +437,8 @@ export default function Home() {
             <Thread
               messages={activeConv.messages}
               fakeStreamText={fakeStreamText}
-              isFakeStreaming={isFakeStreaming}
-              isStreaming={isStreaming}
+              isFakeStreaming={isFakeStreaming && streamingConvId === activeId}
+              isStreaming={isStreaming && streamingConvId === activeId}
               progressStage={progressStage}
               hoveredCite={hoveredCite}
               onHover={setHoveredCite}
@@ -438,6 +448,9 @@ export default function Home() {
               onShare={handleShare}
               title={activeConv.title}
               sessionId={activeConv.sessionId}
+              onMobileMenu={() => setMobileSidebarOpen(true)}
+              onMobileSources={() => setMobileEvidenceOpen(true)}
+              sourcesCount={citedPapers.length}
             />
             <Composer onSubmit={handleSubmit} disabled={isStreaming} depth={depth} onDepthChange={setDepth} yearFrom={yearFrom} onYearFromChange={setYearFrom} k={k} onKChange={setK} />
           </div>
@@ -453,6 +466,8 @@ export default function Home() {
         depth={lastResult?.depth_reached ?? 0}
         hoveredCite={hoveredCite}
         onHover={setHoveredCite}
+        mobileOpen={mobileEvidenceOpen}
+        onMobileClose={() => setMobileEvidenceOpen(false)}
       />
     </div>
   );
