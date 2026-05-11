@@ -1,9 +1,17 @@
 import asyncio
 import json
+import logging
+import traceback
 from uuid import uuid4
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +22,10 @@ from scholr.orchestrator import run_research
 from scholr.state import ResearchState
 
 app = FastAPI()
+
+@app.on_event("startup")
+async def startup():
+    logger.info("Scholr API started")
 
 app.add_middleware(
     CORSMiddleware,
@@ -71,7 +83,10 @@ async def research(body: ResearchRequest):
     queue: asyncio.Queue[str | None] = asyncio.Queue()
     session_id = body.session_id or str(uuid4())
 
+    logger.info("Query received: %r (session=%s, k=%d, year_from=%s)", body.query, session_id, body.k, body.year_from)
+
     def on_event(event: str) -> None:
+        logger.info(event)
         queue.put_nowait(_sse("progress", event))
 
     async def run() -> None:
@@ -88,6 +103,7 @@ async def research(body: ResearchRequest):
             else:
                 queue.put_nowait(_sse("result", _build_result(result)))
         except Exception as e:
+            logger.error("Pipeline error for query %r:\n%s", body.query, traceback.format_exc())
             queue.put_nowait(_sse("error", str(e)))
         finally:
             queue.put_nowait(None)
