@@ -5,9 +5,10 @@ import { useState } from "react";
 
 interface AuthGateProps {
   onAuthenticated: () => void;
+  postQuery?: boolean;
 }
 
-export function AuthGate({ onAuthenticated }: AuthGateProps) {
+export function AuthGate({ onAuthenticated, postQuery }: AuthGateProps) {
   const [mode, setMode] = useState<"signin" | "register">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -76,9 +77,11 @@ export function AuthGate({ onAuthenticated }: AuthGateProps) {
 
       <div className="gate__panel">
         <div className="gate__title">
-          {mode === "signin" ? "Sign in" : "Create account"}
+          {postQuery ? "That's what real research looks like." : mode === "signin" ? "Sign in" : "Create account"}
         </div>
-        <div className="gate__sub">10 free queries per day during beta</div>
+        <div className="gate__sub">
+          {postQuery ? "Sign up free to keep going — 10 queries per day." : "10 free queries per day during beta"}
+        </div>
 
         <button className="gate__google" onClick={handleGoogle}>
           Continue with Google

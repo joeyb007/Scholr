@@ -112,6 +112,9 @@ export default function Home() {
   const [yearFrom, setYearFrom] = useState<number | null>(null);
   const [k, setK] = useState(8);
   const [upgradeInfo, setUpgradeInfo] = useState<{ used: number; limit: number } | null>(null);
+  const [anonQueryDone, setAnonQueryDone] = useState(() =>
+    typeof window !== "undefined" && localStorage.getItem("scholr_anon_done") === "true"
+  );
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileEvidenceOpen, setMobileEvidenceOpen] = useState(false);
   const [ready, setReady] = useState(false);
@@ -221,6 +224,8 @@ export default function Home() {
     if (!activeId || isStreaming) return;
 
     const isFirstQuery = (activeConv?.messages.length ?? 0) === 0;
+
+    if (status === "unauthenticated" && anonQueryDone) return;
 
     if (status === "authenticated") {
       const limitRes = await fetch("/api/query-limit", { method: "POST" });
@@ -353,6 +358,10 @@ export default function Home() {
             clearInterval(tick);
             setIsFakeStreaming(false);
             setStreamingConvId(null);
+            if (status === "unauthenticated") {
+              setAnonQueryDone(true);
+              localStorage.setItem("scholr_anon_done", "true");
+            }
             return;
           }
           revealed += tokens[i++];
@@ -414,11 +423,11 @@ export default function Home() {
     } catch {}
   }
 
-  const showAuthGate = status === "unauthenticated";
+  const showAuthGate = status === "unauthenticated" && anonQueryDone;
 
   return (
     <div className="app">
-      {showAuthGate && <AuthGate onAuthenticated={() => {}} />}
+      {showAuthGate && <AuthGate onAuthenticated={() => {}} postQuery={anonQueryDone} />}
       {upgradeInfo && <UpgradeModal used={upgradeInfo.used} limit={upgradeInfo.limit} onClose={() => setUpgradeInfo(null)} />}
       {mobileSidebarOpen && <div className="mobile-overlay" onClick={() => setMobileSidebarOpen(false)} />}
       {mobileEvidenceOpen && <div className="mobile-overlay" onClick={() => setMobileEvidenceOpen(false)} />}
