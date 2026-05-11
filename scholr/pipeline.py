@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 from scholr.compression import compress_papers
 from scholr.coverage import check_coverage
@@ -9,7 +10,7 @@ from scholr.state import EvidenceClaim, ResearchState, existing_ids
 from scholr.synthesis import stream_answer, synthesize
 
 MAX_DEPTH = 2
-MAX_PAPERS = 20
+MAX_PAPERS = 15
 MAX_RETRIES = 3
 
 
@@ -44,19 +45,23 @@ async def run_pipeline(
 
     for depth in range(MAX_DEPTH):
         on_event(f"[Level {depth}] expanding concepts")
-        expansions = await expand_papers(state, on_event)
+        # Run expansion and coverage concurrently — both only read state.papers
+        expansions, coverage = await asyncio.gather(
+            expand_papers(state, on_event),
+            check_coverage(state, on_event),
+        )
         follow_up_queries = merge_expansions(state, expansions)
-        if len(state.papers) >= MAX_PAPERS or not follow_up_queries:
+        if len(state.papers) >= MAX_PAPERS:
             state.depth_reached = depth
             break
-        extra = await retrieve_papers(follow_up_queries[:8], existing_ids(state), on_event, k=k, year_from=year_from)
-        state.papers.extend(extra)
-
-    on_event("[Coverage] checking completeness")
-    coverage = await check_coverage(state, on_event)
-    if not coverage.sufficient:
-        on_event("[Coverage] retrieving missing aspects")
-        extra = await retrieve_papers(coverage.extra_queries, existing_ids(state), on_event, k=k, year_from=year_from)
+        # Combine expansion + coverage gaps into one retrieval round
+        extra_queries = list(dict.fromkeys(
+            follow_up_queries[:4] + (coverage.extra_queries if not coverage.sufficient else [])
+        ))
+        if not extra_queries:
+            state.depth_reached = depth
+            break
+        extra = await retrieve_papers(extra_queries[:6], existing_ids(state), on_event, k=k, year_from=year_from)
         state.papers.extend(extra)
 
     if len(state.papers) > MAX_PAPERS:
