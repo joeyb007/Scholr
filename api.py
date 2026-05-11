@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 from uuid import uuid4
 from dotenv import load_dotenv
 
@@ -16,12 +15,11 @@ from scholr.state import ResearchState
 
 app = FastAPI()
 
-_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",")]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_origins,
+    allow_origins=["*"],
     allow_methods=["POST", "GET", "OPTIONS"],
-    allow_headers=["*", "X-User-Id"],
+    allow_headers=["*"],
 )
 
 
