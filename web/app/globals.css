@@ -290,6 +290,8 @@ input { font: inherit; color: inherit; background: transparent; border: none; ou
 .evidence__mobile-close { display: none; }
 
 @media (max-width: 768px) {
+  .app { height: 100dvh; }
+  .composer { position: sticky; bottom: 0; background: var(--bg); z-index: 10; }
   /* sidebar: hidden by default, slides in from left */
   .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; transform: translateX(-100%); transition: transform 0.25s ease; width: 280px; }
   .sidebar--mobile-open { transform: translateX(0); box-shadow: 4px 0 24px rgba(0,0,0,0.4); }
