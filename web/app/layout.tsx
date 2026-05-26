@@ -1,3 +1,5 @@
+"use client";
+
 import { SessionProvider } from "next-auth/react";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
