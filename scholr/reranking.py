@@ -51,3 +51,16 @@ def rerank_by_cross_encoder(query: str, papers: list[Paper], top_k: int) -> list
 
     ranked = sorted(zip(papers, scores), key=lambda pair: pair[1], reverse=True)
     return [p for p, _ in ranked[:top_k]]
+
+
+def rerank_papers(
+    query: str,
+    papers: list[Paper],
+    bi_top_n: int,
+    final_top_k: int,
+) -> list[Paper]:
+    """Two-stage rerank: bi-encoder narrows the candidate pool by abstract
+    similarity (fast, runs over the full pool), then the cross-encoder does
+    a precision-focused rerank on the narrowed set using title+abstract."""
+    narrowed = select_top_by_similarity(query, papers, bi_top_n)
+    return rerank_by_cross_encoder(query, narrowed, final_top_k)
