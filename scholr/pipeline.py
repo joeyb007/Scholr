@@ -4,29 +4,33 @@ from scholr.compression import compress_papers
 from scholr.coverage import check_coverage
 from scholr.expansion import expand_papers, merge_expansions
 from scholr.planner import plan_queries
+from scholr.reranking import rerank_papers
 from scholr.retrieval import retrieve_papers
 from scholr.session import fresh_state, load_session, save_session
 from scholr.state import EvidenceClaim, ResearchState, existing_ids
 from scholr.synthesis import stream_answer, synthesize
 
 MAX_DEPTH = 2
-MAX_PAPERS = 15
+MAX_CANDIDATES = 60   # candidate pool size before reranking narrows it down
+MAX_PAPERS = 15       # final paper count fed to synthesis, after reranking
+BI_ENCODER_TOP_N = 25 # bi-encoder narrows candidates to this before the cross-encoder
 MAX_RETRIES = 3
 
 
-async def run_pipeline(
+async def _gather_candidates(
     query: str,
     session_id: str,
-    on_event: Callable[[str], None] = lambda _: None,
-    on_token: Callable[[str], None] | None = None,
+    on_event: Callable[[str], None],
     k: int = 8,
     year_from: int | None = None,
 ) -> ResearchState:
+    """Runs planning, retrieval, and the expansion/coverage loop. Returns a
+    state with up to MAX_CANDIDATES papers — no final truncation or reranking
+    applied. Shared by run_pipeline() and the offline eval harness."""
     state = await load_session(session_id) or fresh_state(query, session_id)
     state.query = query  # always use the current query for planning and synthesis
     on_event("[Session] loading context")
 
-    # Retrieval with retry — planner reformulates on each failed attempt
     failed_queries: list[str] = []
     for attempt in range(MAX_RETRIES + 1):
         if attempt > 0:
@@ -51,7 +55,7 @@ async def run_pipeline(
             check_coverage(state, on_event),
         )
         follow_up_queries = merge_expansions(state, expansions)
-        if len(state.papers) >= MAX_PAPERS:
+        if len(state.papers) >= MAX_CANDIDATES:
             state.depth_reached = depth
             break
         # Combine expansion + coverage gaps into one retrieval round
@@ -64,8 +68,22 @@ async def run_pipeline(
         extra = await retrieve_papers(extra_queries[:6], existing_ids(state), on_event, k=k, year_from=year_from)
         state.papers.extend(extra)
 
+    return state
+
+
+async def run_pipeline(
+    query: str,
+    session_id: str,
+    on_event: Callable[[str], None] = lambda _: None,
+    on_token: Callable[[str], None] | None = None,
+    k: int = 8,
+    year_from: int | None = None,
+) -> ResearchState:
+    state = await _gather_candidates(query, session_id, on_event, k=k, year_from=year_from)
+
     if len(state.papers) > MAX_PAPERS:
-        state.papers = state.papers[:MAX_PAPERS]
+        on_event(f"[Rerank] narrowing {len(state.papers)} candidates to {MAX_PAPERS}")
+        state.papers = rerank_papers(state.query, state.papers, BI_ENCODER_TOP_N, MAX_PAPERS)
 
     on_event("[Compression] extracting key points")
     state.paper_facts = await compress_papers(state, on_event)

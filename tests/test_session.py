@@ -1,8 +1,4 @@
-import json
-import pytest
-from pathlib import Path
 from scholr.session import load_session, save_session, fresh_state
-from scholr.state import ResearchState
 
 
 def test_fresh_state():
@@ -12,38 +8,70 @@ def test_fresh_state():
     assert state.papers == []
 
 
-def test_save_and_load_round_trip(tmp_path, monkeypatch):
-    monkeypatch.setattr("scholr.session.SESSIONS_DIR", tmp_path)
+async def test_load_session_returns_none_without_database_url(monkeypatch):
+    monkeypatch.setattr("scholr.session._DB_URL", None)
+    result = await load_session("session-1")
+    assert result is None
+
+
+async def test_save_session_noops_without_database_url(monkeypatch, mocker):
+    monkeypatch.setattr("scholr.session._DB_URL", None)
+    mock_to_thread = mocker.patch("asyncio.to_thread")
+    await save_session(fresh_state("query", "s1"))
+    mock_to_thread.assert_not_called()
+
+
+async def test_save_and_load_round_trip(monkeypatch, mocker):
+    monkeypatch.setattr("scholr.session._DB_URL", "postgres://fake")
     state = fresh_state("explain transformers", "session-1")
     state.planned_queries = ["transformer attention mechanism"]
 
-    save_session(state)
+    stored: dict[str, str] = {}
 
-    loaded = load_session("session-1")
+    def fake_sync_save(session_id: str, state_json: str) -> None:
+        stored[session_id] = state_json
+
+    def fake_sync_load(session_id: str) -> str | None:
+        return stored.get(session_id)
+
+    mocker.patch("scholr.session._sync_save", side_effect=fake_sync_save)
+    mocker.patch("scholr.session._sync_load", side_effect=fake_sync_load)
+
+    await save_session(state)
+    loaded = await load_session("session-1")
+
     assert loaded is not None
     assert loaded.query == "explain transformers"
     assert loaded.planned_queries == ["transformer attention mechanism"]
 
 
-def test_load_session_returns_none_for_missing(tmp_path, monkeypatch):
-    monkeypatch.setattr("scholr.session.SESSIONS_DIR", tmp_path)
-    result = load_session("nonexistent-session")
+async def test_load_session_returns_none_for_missing(monkeypatch, mocker):
+    monkeypatch.setattr("scholr.session._DB_URL", "postgres://fake")
+    mocker.patch("scholr.session._sync_load", return_value=None)
+
+    result = await load_session("nonexistent-session")
     assert result is None
 
 
-def test_load_session_returns_none_on_schema_drift(tmp_path, monkeypatch):
-    monkeypatch.setattr("scholr.session.SESSIONS_DIR", tmp_path)
-    path = tmp_path / "bad-session.json"
-    path.write_text(json.dumps({"completely": "wrong", "schema": True}))
+async def test_load_session_returns_none_on_schema_drift(monkeypatch, mocker):
+    monkeypatch.setattr("scholr.session._DB_URL", "postgres://fake")
+    mocker.patch("scholr.session._sync_load", return_value='{"completely": "wrong", "schema": true}')
 
-    result = load_session("bad-session")
+    result = await load_session("bad-session")
     assert result is None
 
 
-def test_save_creates_sessions_dir(tmp_path, monkeypatch):
-    sessions_dir = tmp_path / "new_sessions"
-    monkeypatch.setattr("scholr.session.SESSIONS_DIR", sessions_dir)
-    state = fresh_state("query", "s1")
-    save_session(state)
-    assert sessions_dir.exists()
-    assert (sessions_dir / "s1.json").exists()
+async def test_load_session_returns_none_on_db_error(monkeypatch, mocker):
+    monkeypatch.setattr("scholr.session._DB_URL", "postgres://fake")
+    mocker.patch("scholr.session._sync_load", side_effect=Exception("connection refused"))
+
+    result = await load_session("session-1")
+    assert result is None
+
+
+async def test_save_session_swallows_db_error(monkeypatch, mocker):
+    monkeypatch.setattr("scholr.session._DB_URL", "postgres://fake")
+    mocker.patch("scholr.session._sync_save", side_effect=Exception("connection refused"))
+
+    # Should not raise even though the underlying save fails.
+    await save_session(fresh_state("query", "s1"))

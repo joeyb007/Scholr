@@ -20,18 +20,15 @@ def _make_synthesis(paper_ids: list[str]) -> SynthesisResult:
     )
 
 
-async def test_run_pipeline_raises_on_empty_retrieval(tmp_path, monkeypatch):
-    monkeypatch.setattr("scholr.session.SESSIONS_DIR", tmp_path)
-
+async def test_run_pipeline_raises_on_empty_retrieval():
     with patch("scholr.pipeline.plan_queries", new_callable=AsyncMock, return_value=["q1"]), \
          patch("scholr.pipeline.retrieve_papers", new_callable=AsyncMock, return_value=[]):
         with pytest.raises(ValueError, match="No papers found"):
             await run_pipeline("test query", "s1")
 
 
-async def test_run_pipeline_saves_session(tmp_path, monkeypatch):
-    monkeypatch.setattr("scholr.session.SESSIONS_DIR", tmp_path)
-
+async def test_run_pipeline_saves_session(mocker):
+    mock_save = mocker.patch("scholr.pipeline.save_session", new_callable=AsyncMock)
     paper = _make_paper("p1")
     with patch("scholr.pipeline.plan_queries", new_callable=AsyncMock, return_value=["q1"]), \
          patch("scholr.pipeline.retrieve_papers", new_callable=AsyncMock, return_value=[paper]), \
@@ -41,7 +38,7 @@ async def test_run_pipeline_saves_session(tmp_path, monkeypatch):
          patch("scholr.pipeline.synthesize", new_callable=AsyncMock, return_value=_make_synthesis(["p1"])):
         state = await run_pipeline("test query", "s1")
 
-    assert (tmp_path / "s1.json").exists()
+    mock_save.assert_called_once()
     assert state.session_id == "s1"
 
 
@@ -75,9 +72,8 @@ def test_validate_evidence_keeps_valid_ids(sample_paper, sample_synthesis):
     assert sample_paper.paper_id in state.final_output.evidence_map[0].paper_ids
 
 
-async def test_run_pipeline_streams_events(tmp_path, monkeypatch):
-    monkeypatch.setattr("scholr.session.SESSIONS_DIR", tmp_path)
-
+async def test_run_pipeline_streams_events(mocker):
+    mocker.patch("scholr.pipeline.save_session", new_callable=AsyncMock)
     paper = _make_paper("p1")
     with patch("scholr.pipeline.plan_queries", new_callable=AsyncMock, return_value=["q1"]), \
          patch("scholr.pipeline.retrieve_papers", new_callable=AsyncMock, return_value=[paper]), \
@@ -90,3 +86,25 @@ async def test_run_pipeline_streams_events(tmp_path, monkeypatch):
 
     assert any("[Done]" in e for e in events)
     assert any("[Session]" in e for e in events)
+
+
+def _make_many_papers(n: int) -> list:
+    return [_make_paper(f"p{i}") for i in range(n)]
+
+
+async def test_run_pipeline_reranks_when_over_max_papers(mocker):
+    mocker.patch("scholr.pipeline.save_session", new_callable=AsyncMock)
+    many_papers = _make_many_papers(20)
+    reranked = many_papers[:15]
+    mock_rerank = mocker.patch("scholr.pipeline.rerank_papers", return_value=reranked)
+
+    with patch("scholr.pipeline.plan_queries", new_callable=AsyncMock, return_value=["q1"]), \
+         patch("scholr.pipeline.retrieve_papers", new_callable=AsyncMock, return_value=many_papers), \
+         patch("scholr.pipeline.expand_papers", new_callable=AsyncMock, return_value=ExpansionOutput(expansions=[])), \
+         patch("scholr.pipeline.check_coverage", new_callable=AsyncMock, return_value=CoverageOutput(sufficient=True, missing_aspects=[], extra_queries=[])), \
+         patch("scholr.pipeline.compress_papers", new_callable=AsyncMock, return_value={}), \
+         patch("scholr.pipeline.synthesize", new_callable=AsyncMock, return_value=_make_synthesis(["p0"])):
+        state = await run_pipeline("test query", "s1")
+
+    mock_rerank.assert_called_once()
+    assert len(state.papers) == 15
