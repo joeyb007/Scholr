@@ -9,11 +9,13 @@ from scholr.state import Paper
 _OA_URL = "https://api.openalex.org/works"
 _DEFAULT_K = 8
 _FETCH_TIMEOUT = 30.0
-_DELAY = 0.1  # polite pool allows 10 req/sec; 2 concurrent at 0.1s = ~10 req/s
+_DELAY = 0.3  # polite pool allows 10 req/sec; stay comfortably under the limit
+_RETRY_429_WAITS = [30, 60]  # seconds to wait on consecutive 429s before giving up
 
 # Adding an email identifies you to OpenAlex's polite pool (higher rate limits).
 # Set SCHOLR_MAILTO in your environment or it defaults to a generic identifier.
 _MAILTO = os.environ.get("SCHOLR_MAILTO", "scholr-tool")
+_API_KEY = os.environ.get("OPENALEX_API_KEY")
 
 # Two concurrent connections — doubles throughput while staying within polite pool limits.
 _SEMAPHORE = asyncio.Semaphore(2)
@@ -30,18 +32,25 @@ async def retrieve_papers(
 
     async def fetch_one(query: str) -> list[Paper]:
         on_event(f"[Retrieval] {query}")
-        try:
-            async with _SEMAPHORE:
-                return await asyncio.wait_for(
-                    _fetch_openalex(query, k, year_from),
-                    timeout=_FETCH_TIMEOUT,
-                )
-        except asyncio.TimeoutError:
-            on_event(f"[Retrieval] timeout — skipping: {query}")
-            return []
-        except Exception as e:
-            on_event(f"[Retrieval] error ({type(e).__name__}): {e}")
-            return []
+        for attempt, wait in enumerate([0] + _RETRY_429_WAITS):
+            if wait:
+                on_event(f"[Retrieval] rate limited — waiting {wait}s (attempt {attempt}/{len(_RETRY_429_WAITS)})")
+                await asyncio.sleep(wait)
+            try:
+                async with _SEMAPHORE:
+                    return await asyncio.wait_for(
+                        _fetch_openalex(query, k, year_from),
+                        timeout=_FETCH_TIMEOUT,
+                    )
+            except asyncio.TimeoutError:
+                on_event(f"[Retrieval] timeout — skipping: {query}")
+                return []
+            except Exception as e:
+                if "429" in str(e) and attempt < len(_RETRY_429_WAITS):
+                    continue
+                on_event(f"[Retrieval] error ({type(e).__name__}): {e}")
+                return []
+        return []
 
     all_results = await asyncio.gather(*[fetch_one(q) for q in queries])
 
@@ -54,18 +63,26 @@ async def retrieve_papers(
     return results
 
 
+_SELECT = "id,title,abstract_inverted_index,ids,authorships,publication_year,primary_location"
+
+
 async def _fetch_openalex(query: str, max_results: int, year_from: int | None = None) -> list[Paper]:
     await asyncio.sleep(_DELAY)
+    # Build params without 'select' — httpx URL-encodes commas (%2C) which OpenAlex
+    # does not accept in the select field. We append it raw to the URL instead.
     params: dict = {
         "search": query,
         "per-page": max_results,
-        "select": "id,title,abstract_inverted_index,ids,authorships,publication_year,primary_location",
         "mailto": _MAILTO,
     }
+    if _API_KEY:
+        params["api_key"] = _API_KEY
     if year_from is not None:
         params["filter"] = f"from_publication_date:{year_from}-01-01"
     async with httpx.AsyncClient(timeout=_FETCH_TIMEOUT) as http:
-        resp = await http.get(_OA_URL, params=params)
+        req = http.build_request("GET", _OA_URL, params=params)
+        url = str(req.url) + f"&select={_SELECT}"
+        resp = await http.get(url)
         resp.raise_for_status()
         return _parse_works(resp.json().get("results", []), query)
 
