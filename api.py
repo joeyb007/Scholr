@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import traceback
 from uuid import uuid4
 from dotenv import load_dotenv
@@ -13,7 +14,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -22,6 +23,21 @@ from scholr.orchestrator import run_research
 from scholr.state import ResearchState
 
 app = FastAPI()
+
+_IP_LIMIT = 60        # max requests per IP per day
+_ip_counts: dict[str, list] = {}  # {ip: [count, date_str]}
+
+def _check_ip(ip: str) -> bool:
+    from datetime import date
+    today = str(date.today())
+    entry = _ip_counts.get(ip)
+    if not entry or entry[1] != today:
+        _ip_counts[ip] = [1, today]
+        return True
+    if entry[0] >= _IP_LIMIT:
+        return False
+    entry[0] += 1
+    return True
 
 @app.on_event("startup")
 async def startup():
@@ -79,7 +95,10 @@ def _build_result(result: ResearchState) -> dict:
 
 
 @app.post("/research")
-async def research(body: ResearchRequest):
+async def research(body: ResearchRequest, request: Request):
+    ip = request.headers.get("X-Forwarded-For", request.client.host).split(",")[0].strip()
+    if not _check_ip(ip):
+        raise HTTPException(status_code=429, detail="Too many requests — try again tomorrow")
     queue: asyncio.Queue[str | None] = asyncio.Queue()
     session_id = body.session_id or str(uuid4())
 
