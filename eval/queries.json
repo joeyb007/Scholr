@@ -1,0 +1,22 @@
+[
+  {"id": "q01", "query": "How does backpropagation work in neural networks?", "keywords": "backpropagation gradient descent neural network training"},
+  {"id": "q02", "query": "What is the attention mechanism in transformer models?", "keywords": "attention mechanism transformer self-attention"},
+  {"id": "q03", "query": "What are the limitations of convolutional neural networks for image classification?", "keywords": "convolutional neural network limitations image classification"},
+  {"id": "q04", "query": "How does reinforcement learning from human feedback (RLHF) work?", "keywords": "reinforcement learning human feedback RLHF language model alignment"},
+  {"id": "q05", "query": "What causes catastrophic forgetting in neural networks?", "keywords": "catastrophic forgetting continual learning neural network"},
+  {"id": "q06", "query": "How do diffusion models generate images?", "keywords": "diffusion models image generation score matching"},
+  {"id": "q07", "query": "What is the vanishing gradient problem and how is it solved?", "keywords": "vanishing gradient problem deep network training"},
+  {"id": "q08", "query": "How does contrastive learning work in self-supervised representation learning?", "keywords": "contrastive learning self-supervised representation learning"},
+  {"id": "q09", "query": "What are graph neural networks used for?", "keywords": "graph neural networks applications node classification"},
+  {"id": "q10", "query": "What is the role of positional encoding in transformer models?", "keywords": "positional encoding transformer sequence order"},
+  {"id": "q11", "query": "What is knowledge distillation in deep learning?", "keywords": "knowledge distillation teacher student model compression"},
+  {"id": "q12", "query": "How do variational autoencoders learn latent representations?", "keywords": "variational autoencoder latent space generative model"},
+  {"id": "q13", "query": "How does federated learning preserve data privacy?", "keywords": "federated learning data privacy distributed training"},
+  {"id": "q14", "query": "What are the theoretical guarantees of generative adversarial networks?", "keywords": "generative adversarial network convergence theory Nash equilibrium"},
+  {"id": "q15", "query": "How does curriculum learning improve neural network training?", "keywords": "curriculum learning training order neural network"},
+  {"id": "q16", "query": "What causes mode collapse in GANs and how can it be mitigated?", "keywords": "mode collapse GAN training instability mitigation"},
+  {"id": "q17", "query": "How do mixture-of-experts architectures scale large language models?", "keywords": "mixture of experts sparse gating large language model scaling"},
+  {"id": "q18", "query": "What is the lottery ticket hypothesis in neural network pruning?", "keywords": "lottery ticket hypothesis neural network pruning sparse subnetwork"},
+  {"id": "q19", "query": "How does retrieval-augmented generation reduce hallucination in language models?", "keywords": "retrieval augmented generation hallucination language model"},
+  {"id": "q20", "query": "What is the double descent phenomenon in deep learning generalization?", "keywords": "double descent generalization bias-variance deep learning"}
+]
