@@ -1,0 +1,248 @@
+{
+  "q01": {
+    "query": "How does backpropagation work in neural networks?",
+    "judgments": {
+      "W2163605009": 1,
+      "W1686810756": 1,
+      "W1832693441": 0,
+      "W2809254203": 1,
+      "W3168997536": 1,
+      "W2613718673": 0,
+      "W2621826044": 2
+    }
+  },
+  "q02": {
+    "query": "What is the attention mechanism in transformer models?",
+    "judgments": {
+      "W2626778328": 2,
+      "W3177318507": 1,
+      "W3127751679": 1,
+      "W4382203079": 1,
+      "W2112796928": 0,
+      "W2964110616": 2,
+      "W3133696297": 2
+    }
+  },
+  "q03": {
+    "query": "What are the limitations of convolutional neural networks for image classification?",
+    "judgments": {
+      "W2809254203": 2,
+      "W3168997536": 2,
+      "W3047443805": 0,
+      "W2807436399": 2,
+      "W2962946486": 0,
+      "W2963076818": 0
+    }
+  },
+  "q04": {
+    "query": "How does reinforcement learning from human feedback (RLHF) work?",
+    "judgments": {
+      "W4223908421": 2,
+      "W4386437475": 2,
+      "W4390215524": 2,
+      "W4385436553": 2,
+      "W4378188762": 0,
+      "W4391399751": 1,
+      "W4393153123": 1,
+      "W4387838992": 2
+    }
+  },
+  "q05": {
+    "query": "What causes catastrophic forgetting in neural networks?",
+    "judgments": {
+      "W2560647685": 2,
+      "W2743151379": 2,
+      "W2963560049": 2,
+      "W2964067969": 2,
+      "W2113839990": 2,
+      "W2949819354": 2,
+      "W2150595230": 2
+    }
+  },
+  "q06": {
+    "query": "How do diffusion models generate images?",
+    "judgments": {
+      "W3036167779": 2,
+      "W4389370799": 1,
+      "W4375869427": 1,
+      "W3212516020": 2,
+      "W2116823839": 0,
+      "W4224035735": 1
+    }
+  },
+  "q07": {
+    "query": "What is the vanishing gradient problem and how is it solved?",
+    "judgments": {
+      "W1678356000": 0,
+      "W1522301498": 1,
+      "W2964268978": 0,
+      "W2952020389": 0,
+      "W2016859302": 0,
+      "W1979666307": 0
+    }
+  },
+  "q08": {
+    "query": "How does contrastive learning work in self-supervised representation learning?",
+    "judgments": {
+      "W2112796928": 0,
+      "W1479807131": 1,
+      "W2107726111": 0,
+      "W2954996726": 1,
+      "W3035060554": 2,
+      "W3114632476": 2,
+      "W2979750740": 0,
+      "W2984353870": 1
+    }
+  },
+  "q09": {
+    "query": "What are graph neural networks used for?",
+    "judgments": {
+      "W2163605009": 0,
+      "W4294558607": 2,
+      "W2112796928": 0,
+      "W2790404832": 2,
+      "W3024961463": 2,
+      "W2008620264": 0
+    }
+  },
+  "q10": {
+    "query": "What is the role of positional encoding in transformer models?",
+    "judgments": {
+      "W2970231061": 1,
+      "W3047855151": 0,
+      "W4376226279": 1,
+      "W2903739847": 1,
+      "W3128592650": 0,
+      "W3017637887": 0,
+      "W3133458480": 0,
+      "W3111174583": 0
+    }
+  },
+  "q11": {
+    "query": "What is knowledge distillation in deep learning?",
+    "judgments": {
+      "W3043350800": 2,
+      "W2954996726": 0,
+      "W3082947597": 1,
+      "W2620998106": 2,
+      "W3113303810": 2,
+      "W3140854437": 1,
+      "W2739879705": 2
+    }
+  },
+  "q12": {
+    "query": "How do variational autoencoders learn latent representations?",
+    "judgments": {
+      "W2948978827": 2,
+      "W2753738274": 2,
+      "W2963085847": 1,
+      "W2752796333": 2,
+      "W2963799213": 2,
+      "W2912305564": 1,
+      "W2725606191": 1,
+      "W2594041373": 1
+    }
+  },
+  "q13": {
+    "query": "How does federated learning preserve data privacy?",
+    "judgments": {
+      "W2974429275": 2,
+      "W3021654819": 2,
+      "W2995022099": 2,
+      "W3016632787": 2,
+      "W3014538993": 2,
+      "W3095859802": 2,
+      "W2767079719": 2
+    }
+  },
+  "q14": {
+    "query": "What are the theoretical guarantees of generative adversarial networks?",
+    "judgments": {
+      "W4298289240": 1,
+      "W2789226849": 1,
+      "W4293762926": 1,
+      "W3002944878": 2,
+      "W2963001579": 0,
+      "W4360620450": 0,
+      "W2580458810": 0,
+      "W2657631929": 0
+    }
+  },
+  "q15": {
+    "query": "How does curriculum learning improve neural network training?",
+    "judgments": {
+      "W2954996726": 1,
+      "W2885593519": 2,
+      "W2963081269": 2,
+      "W2965857891": 0,
+      "W4221151978": 0,
+      "W3080253043": 0,
+      "W2153959628": 0,
+      "W3097816393": 1
+    }
+  },
+  "q16": {
+    "query": "What causes mode collapse in GANs and how can it be mitigated?",
+    "judgments": {
+      "W3204937802": 2,
+      "W3201409833": 2,
+      "W4365131572": 0,
+      "W3088157974": 1,
+      "W3161307971": 1,
+      "W3192454176": 0,
+      "W4323706279": 1,
+      "W4390691388": 0
+    }
+  },
+  "q17": {
+    "query": "How do mixture-of-experts architectures scale large language models?",
+    "judgments": {
+      "W2112796928": 0,
+      "W4362515116": 1,
+      "W4322718191": 1,
+      "W4307079201": 1,
+      "W2964110616": 0,
+      "W4391855109": 1,
+      "W4200634402": 2,
+      "W4318718936": 0
+    }
+  },
+  "q18": {
+    "query": "What is the lottery ticket hypothesis in neural network pruning?",
+    "judgments": {
+      "W2805003733": 2,
+      "W2963813662": 2,
+      "W4389104738": 1,
+      "W2948635472": 2,
+      "W2792760996": 2,
+      "W3137329786": 2,
+      "W2919347051": 2,
+      "W2996074092": 2
+    }
+  },
+  "q19": {
+    "query": "How does retrieval-augmented generation reduce hallucination in language models?",
+    "judgments": {
+      "W4389984066": 2,
+      "W4384071683": 0,
+      "W3155807546": 2,
+      "W4391221150": 1,
+      "W4362515116": 1,
+      "W4408145721": 2,
+      "W4389520468": 2,
+      "W4389518671": 2
+    }
+  },
+  "q20": {
+    "query": "What is the double descent phenomenon in deep learning generalization?",
+    "judgments": {
+      "W2954996726": 0,
+      "W2566079294": 1,
+      "W2936503027": 0,
+      "W3176923149": 0,
+      "W3100366369": 0,
+      "W2967536008": 2,
+      "W3172995164": 2
+    }
+  }
+}
