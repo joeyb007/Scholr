@@ -1,6 +1,12 @@
 from collections.abc import Callable
 from scholr.llm import llm_parse
-from scholr.state import ExpansionOutput, ResearchState
+from scholr.reranking import select_top_by_similarity
+from scholr.state import ExpansionOutput, Paper, ResearchState
+
+# Follow-up queries come from within a paper's content, not from breadth across papers.
+# Expanding the 5 most relevant new papers yields ~15 candidate sub-questions; the pipeline
+# only uses the top 4, so this is ample supply while keeping expansion output small.
+EXPAND_TOP_N = 5
 
 _SYSTEM = """You are a research concept extractor. For each provided paper, extract up to 3 \
 specific technical concepts and suggest up to 3 follow-up arXiv keyword search queries that \
@@ -13,12 +19,19 @@ would deepen understanding of the topic. Rules:
 
 async def expand_papers(
     state: ResearchState,
+    candidates: list[Paper],
     on_event: Callable[[str], None],
 ) -> ExpansionOutput:
-    on_event(f"[Expansion] processing {len(state.papers)} papers")
+    """Expands only the most relevant papers from the given candidate batch (the
+    papers just retrieved), not the full accumulated pool. Narrowing by bi-encoder
+    relevance keeps follow-up queries on-topic and caps expansion output cost."""
+    focused = select_top_by_similarity(state.query, candidates, EXPAND_TOP_N)
+    on_event(f"[Expansion] processing {len(focused)} of {len(candidates)} new papers")
+    if not focused:
+        return ExpansionOutput(expansions=[])
     papers_text = "\n\n".join(
         f"paper_id: {p.paper_id}\ntitle: {p.title}\nabstract: {p.abstract[:600]}"
-        for p in state.papers
+        for p in focused
     )
     user = f"Papers to expand:\n\n{papers_text}"
     return await llm_parse(_SYSTEM, user, ExpansionOutput)

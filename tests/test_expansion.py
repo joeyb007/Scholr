@@ -22,8 +22,10 @@ async def test_expand_papers_returns_output(mocker):
         PaperExpansion(paper_id="p1", concepts=["attention"], follow_up_queries=["attention limits"])
     ])
     mocker.patch("scholr.expansion.llm_parse", new_callable=AsyncMock, return_value=expected)
+    # Bypass the bi-encoder — return the candidate batch unchanged so no model loads.
+    mocker.patch("scholr.expansion.select_top_by_similarity", side_effect=lambda q, papers, n: papers)
 
-    result = await expand_papers(state, lambda _: None)
+    result = await expand_papers(state, state.papers, lambda _: None)
     assert len(result.expansions) == 1
     assert result.expansions[0].paper_id == "p1"
 

@@ -8,7 +8,7 @@ from scholr.planner import plan_queries
 from scholr.reranking import rerank_papers
 from scholr.retrieval import retrieve_papers
 from scholr.session import fresh_state, load_session, save_session
-from scholr.state import EvidenceClaim, ResearchState, existing_ids
+from scholr.state import EvidenceClaim, Paper, ResearchState, existing_ids
 from scholr.synthesis import stream_answer, synthesize
 
 MAX_DEPTH = 2
@@ -41,6 +41,7 @@ async def _gather_candidates(
     on_event("[Session] loading context")
 
     failed_queries: list[str] = []
+    last_batch: list[Paper] = []  # most recently retrieved papers — the set expansion mines
     for attempt in range(MAX_RETRIES + 1):
         if attempt > 0:
             on_event(f"[Planner] no results — reformulating (attempt {attempt}/{MAX_RETRIES})")
@@ -52,6 +53,7 @@ async def _gather_candidates(
         )
         if new_papers:
             state.papers.extend(new_papers)
+            last_batch = new_papers
             on_event(f"[Retrieval] {len(new_papers)} papers found, {len(state.papers)} total")
             break
         failed_queries = list(state.planned_queries)
@@ -63,10 +65,11 @@ async def _gather_candidates(
 
     for depth in range(MAX_DEPTH):
         on_event(f"[Level {depth}] expanding concepts")
-        # Run expansion and coverage concurrently — both only read state.papers
+        # Expansion mines only the newly-retrieved batch; coverage judges the full pool.
+        # Both run concurrently and only read state.
         t0 = time.perf_counter()
         expansions, coverage = await asyncio.gather(
-            expand_papers(state, on_event),
+            expand_papers(state, last_batch, on_event),
             check_coverage(state, on_event),
         )
         ms = (time.perf_counter() - t0) * 1000
@@ -89,6 +92,7 @@ async def _gather_candidates(
             on_event,
         )
         state.papers.extend(extra)
+        last_batch = extra
         on_event(f"[Retrieval] {len(extra)} new papers, {len(state.papers)} total")
 
     return state
