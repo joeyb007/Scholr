@@ -9,7 +9,7 @@ from scholr.state import Paper
 _OA_URL = "https://api.openalex.org/works"
 _DEFAULT_K = 8
 _FETCH_TIMEOUT = 30.0
-_DELAY = 0.3  # polite pool allows 10 req/sec; stay comfortably under the limit
+_DELAY = 0.1  # API key puts us on the polite pool (10 req/sec); 0.1s keeps us well under
 _RETRY_429_WAITS = [30, 60]  # seconds to wait on consecutive 429s before giving up
 
 # Adding an email identifies you to OpenAlex's polite pool (higher rate limits).
@@ -17,8 +17,8 @@ _RETRY_429_WAITS = [30, 60]  # seconds to wait on consecutive 429s before giving
 _MAILTO = os.environ.get("SCHOLR_MAILTO", "scholr-tool")
 _API_KEY = os.environ.get("OPENALEX_API_KEY")
 
-# Two concurrent connections — doubles throughput while staying within polite pool limits.
-_SEMAPHORE = asyncio.Semaphore(2)
+# Match semaphore to max queries per round so all fire concurrently within polite pool limits.
+_SEMAPHORE = asyncio.Semaphore(5)
 
 
 async def retrieve_papers(
