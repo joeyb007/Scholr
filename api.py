@@ -41,6 +41,33 @@ def _check_ip(ip: str) -> bool:
 
 @app.on_event("startup")
 async def startup():
+    """Warm expensive one-time costs before the first user query lands:
+    the OpenAI TLS/connection pool and both reranker models. Each is guarded
+    so a warmup failure never blocks the server from accepting traffic."""
+    import time
+
+    from scholr.llm import get_client
+    from scholr.reranking import _get_bi_encoder, _get_cross_encoder
+
+    # OpenAI connection pool — a cheap GET establishes TLS + keep-alive socket.
+    t0 = time.perf_counter()
+    try:
+        await get_client().models.list()
+        logger.info("Warmup: OpenAI connection ready (%.0fms)", (time.perf_counter() - t0) * 1000)
+    except Exception as e:
+        logger.warning("Warmup: OpenAI connection failed (%s) — first query pays the cost", e)
+
+    # Reranker models — load weights into memory off the event loop.
+    t0 = time.perf_counter()
+    try:
+        await asyncio.gather(
+            asyncio.to_thread(_get_bi_encoder),
+            asyncio.to_thread(_get_cross_encoder),
+        )
+        logger.info("Warmup: reranker models loaded (%.0fms)", (time.perf_counter() - t0) * 1000)
+    except Exception as e:
+        logger.warning("Warmup: reranker model load failed (%s) — first rerank pays the cost", e)
+
     logger.info("Scholr API started")
 
 app.add_middleware(
