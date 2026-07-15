@@ -64,6 +64,24 @@ async def test_stream_answer_calls_on_token_and_returns_full_text(mocker):
     assert tokens == ["The ", "Transformer ", "uses ", "self-attention."]
 
 
+async def test_synthesize_retries_on_length_failure(mocker, sample_synthesis):
+    from openai import LengthFinishReasonError
+
+    # First call runs away and hits the token cap; retry over fewer papers succeeds.
+    length_error = LengthFinishReasonError(completion=MagicMock())
+    mock_llm = mocker.patch(
+        "scholr.synthesis.llm_parse",
+        new_callable=AsyncMock,
+        side_effect=[length_error, sample_synthesis],
+    )
+    events = []
+    result = await synthesize(_make_state(), events.append)
+
+    assert result is sample_synthesis
+    assert mock_llm.call_count == 2
+    assert any("retrying" in e for e in events)
+
+
 async def test_synthesize_returns_answer_paragraphs(mocker, sample_synthesis):
     mocker.patch("scholr.synthesis.llm_parse", new_callable=AsyncMock, return_value=sample_synthesis)
     result = await synthesize(_make_state(), lambda _: None)

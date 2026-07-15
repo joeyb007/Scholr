@@ -1,6 +1,14 @@
 from collections.abc import Callable
+from openai import LengthFinishReasonError
 from scholr.llm import get_client, llm_parse
 from scholr.state import ResearchState, SynthesisResult
+
+# A real synthesis is ~1–2k tokens. Capping well below gpt-4o-mini's 16k ceiling means a
+# degenerate generation loop fails in seconds instead of running to the ceiling for minutes.
+_SYNTH_MAX_TOKENS = 5000
+# On a length failure, retry over fewer papers — the runaway is driven by too many facts
+# feeding a combinatorial evidence_map, so a smaller pool completes reliably.
+_SYNTH_RETRY_PAPERS = 8
 
 _SYSTEM = """You are a scientific synthesis engine. Produce a structured explanation grounded \
 entirely in the provided paper facts. Rules:
@@ -21,16 +29,21 @@ flowing prose based only on the provided paper facts. Write 2-4 paragraphs. \
 No bullet points, no section headers, no citations — just the answer."""
 
 
-def _build_user_prompt(state: ResearchState) -> str:
+def _build_user_prompt(state: ResearchState, max_papers: int | None = None) -> str:
+    # Trim papers and their facts together so valid_ids and paper_facts stay consistent —
+    # citation [n] tokens index into valid_ids, so both must reference the same paper set.
+    papers = state.papers if max_papers is None else state.papers[:max_papers]
+    valid_ids = [p.paper_id for p in papers]
+    id_set = set(valid_ids)
     facts_text = "\n\n".join(
         f"paper_id: {pid}\nfacts:\n" + "\n".join(f"  - {f}" for f in facts)
         for pid, facts in state.paper_facts.items()
+        if pid in id_set
     )
     concept_text = "\n".join(
         f"  {concept}: {', '.join(pids)}"
         for concept, pids in state.concept_to_papers.items()
     )
-    valid_ids = [p.paper_id for p in state.papers]
     return (
         f"Question: {state.query}\n\n"
         f"Paper facts:\n{facts_text}\n\n"
@@ -66,6 +79,19 @@ async def synthesize(
     on_event: Callable[[str], None],
 ) -> SynthesisResult:
     on_event("[Synthesis] building evidence map")
-    result = await llm_parse(_SYSTEM, _build_user_prompt(state), SynthesisResult)
+    try:
+        result = await llm_parse(
+            _SYSTEM, _build_user_prompt(state), SynthesisResult, max_tokens=_SYNTH_MAX_TOKENS
+        )
+    except LengthFinishReasonError:
+        # Runaway generation hit the token cap — retry over a smaller paper pool so the
+        # structured output stays bounded rather than dropping the whole subtopic.
+        on_event(f"[Synthesis] output truncated — retrying with top {_SYNTH_RETRY_PAPERS} papers")
+        result = await llm_parse(
+            _SYSTEM,
+            _build_user_prompt(state, max_papers=_SYNTH_RETRY_PAPERS),
+            SynthesisResult,
+            max_tokens=_SYNTH_MAX_TOKENS,
+        )
     on_event(f"[Synthesis] {len(result.evidence_map)} evidence claims")
     return result

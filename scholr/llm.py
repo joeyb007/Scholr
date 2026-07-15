@@ -32,6 +32,7 @@ async def llm_parse(
     system: str,
     user: str,
     response_format: type[BaseModel],
+    max_tokens: int | None = None,
 ) -> BaseModel:
     result = await client.beta.chat.completions.parse(
         model=MODEL,
@@ -40,6 +41,7 @@ async def llm_parse(
             {"role": "user", "content": user},
         ],
         response_format=response_format,
+        max_tokens=max_tokens,
     )
     msg = result.choices[0].message
     if msg.refusal:

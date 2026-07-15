@@ -42,6 +42,28 @@ async def test_run_pipeline_saves_session(mocker):
     assert state.session_id == "s1"
 
 
+async def test_run_pipeline_short_circuits_when_coverage_sufficient(mocker):
+    mocker.patch("scholr.pipeline.save_session", new_callable=AsyncMock)
+    mock_retrieve = mocker.patch(
+        "scholr.pipeline.retrieve_papers", new_callable=AsyncMock, return_value=[_make_paper("p1")]
+    )
+    # Expansion yields a follow-up query that WOULD drive another retrieval round —
+    # only the coverage short-circuit should prevent it.
+    expansion = ExpansionOutput(expansions=[
+        PaperExpansion(paper_id="p1", concepts=["c"], follow_up_queries=["deeper query"])
+    ])
+    with patch("scholr.pipeline.plan_queries", new_callable=AsyncMock, return_value=["q1"]), \
+         patch("scholr.pipeline.expand_papers", new_callable=AsyncMock, return_value=expansion), \
+         patch("scholr.pipeline.check_coverage", new_callable=AsyncMock, return_value=CoverageOutput(sufficient=True, missing_aspects=[], extra_queries=[])), \
+         patch("scholr.pipeline.compress_papers", new_callable=AsyncMock, return_value={"p1": ["fact1"]}), \
+         patch("scholr.pipeline.synthesize", new_callable=AsyncMock, return_value=_make_synthesis(["p1"])):
+        state = await run_pipeline("test query", "s1")
+
+    # Only the initial retrieval ran — the depth loop broke on sufficient coverage.
+    mock_retrieve.assert_called_once()
+    assert state.depth_reached == 0
+
+
 def test_validate_evidence_strips_hallucinated_ids(sample_synthesis, sample_paper):
     state = ResearchState(
         query="test", session_id="s1",

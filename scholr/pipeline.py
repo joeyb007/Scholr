@@ -80,8 +80,13 @@ async def _gather_candidates(
         if len(state.papers) >= MAX_CANDIDATES:
             state.depth_reached = depth
             break
+        # Coverage already ran concurrently above — honor its stop signal instead of
+        # recursing further on expansion's follow-ups when the pool already covers the topic.
+        if coverage.sufficient:
+            state.depth_reached = depth
+            break
         extra_queries = list(dict.fromkeys(
-            follow_up_queries[:4] + (coverage.extra_queries if not coverage.sufficient else [])
+            follow_up_queries[:4] + coverage.extra_queries
         ))
         if not extra_queries:
             state.depth_reached = depth
