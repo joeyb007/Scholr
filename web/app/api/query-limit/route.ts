@@ -4,6 +4,9 @@ import { pool } from "@/lib/db";
 
 const FREE_LIMIT = 10;
 
+// Accounts exempt from the daily query limit (owner / internal use).
+const EXEMPT_EMAILS = new Set(["josephbarbosa416@gmail.com"]);
+
 export async function POST() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -11,11 +14,16 @@ export async function POST() {
   const userId = (session.user as { id: string }).id;
 
   const { rows: [user] } = await pool.query(
-    "SELECT queries_today, queries_reset_date FROM users WHERE id = $1",
+    "SELECT email, queries_today, queries_reset_date FROM users WHERE id = $1",
     [userId]
   );
 
   if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+  // Allowlisted accounts skip the limit entirely — no cap, no increment.
+  if (user.email && EXEMPT_EMAILS.has(String(user.email).toLowerCase())) {
+    return NextResponse.json({ used: 0, limit: -1, exempt: true });
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   const resetDate = user.queries_reset_date?.toISOString?.()?.slice(0, 10) ?? today;
