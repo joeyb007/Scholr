@@ -10,31 +10,49 @@ import { Composer } from "@/components/Composer";
 import { AuthGate } from "@/components/AuthGate";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { downloadBibtex } from "@/lib/bibtex";
+import { emptyTrail, applyProgress, applyPaper, finalizeTrail, type TrailState } from "@/lib/trail";
 
 // Renumber citations to sequential 1-based order of first appearance.
 // Keeps evidence panel badges in sync with [n] tokens in the answer text.
 function remapCitations(result: ResearchResult): ResearchResult {
+  // Build the numbering from every field that renders citations, in reading order,
+  // so paragraphs, the Mechanism/Intuition/Limitations/Open-questions sections, and the
+  // papers list all share one consistent [n] scheme.
   const order: number[] = [];
   const seen = new Set<number>();
-  for (const para of result.answer_paragraphs) {
-    for (const m of para.matchAll(/\[(\d+)\]/g)) {
+  const collect = (text: string) => {
+    for (const m of (text || "").matchAll(/\[(\d+)\]/g)) {
       const n = parseInt(m[1]);
       if (!seen.has(n)) { seen.add(n); order.push(n); }
     }
-  }
+  };
+  result.answer_paragraphs.forEach(collect);
+  collect(result.mechanism);
+  collect(result.intuition);
+  collect(result.limitations);
+  collect(result.open_questions);
+
   if (order.length === 0) return result;
   const remap = new Map(order.map((n, i) => [n, i + 1]));
-  const answer_paragraphs = result.answer_paragraphs.map(p =>
-    p.replace(/\[(\d+)\]/g, (_, n) => {
+  const remapText = (t: string) =>
+    (t || "").replace(/\[(\d+)\]/g, (_, n) => {
       const newN = remap.get(parseInt(n));
       return newN !== undefined ? `[${newN}]` : `[${n}]`;
-    })
-  );
+    });
+
   const papers = result.papers
     .filter(p => remap.has(p.n))
     .map(p => ({ ...p, n: remap.get(p.n)! }))
     .sort((a, b) => a.n - b.n);
-  return { ...result, answer_paragraphs, papers };
+  return {
+    ...result,
+    answer_paragraphs: result.answer_paragraphs.map(remapText),
+    mechanism: remapText(result.mechanism),
+    intuition: remapText(result.intuition),
+    limitations: remapText(result.limitations),
+    open_questions: remapText(result.open_questions),
+    papers,
+  };
 }
 
 function applyRemapToMessages(messages: ConversationMessage[]): ConversationMessage[] {
@@ -105,8 +123,10 @@ export default function Home() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isFakeStreaming, setIsFakeStreaming] = useState(false);
-  const [fakeStreamText, setFakeStreamText] = useState("");
+  const [fakeTokens, setFakeTokens] = useState<string[]>([]);
+  const [fakeCount, setFakeCount] = useState(0);
   const [progressStage, setProgressStage] = useState("");
+  const [trail, setTrail] = useState<TrailState | null>(null);
   const [hoveredCite, setHoveredCite] = useState<number | null>(null);
   const [depth, setDepth] = useState(1);
   const [yearFrom, setYearFrom] = useState<number | null>(null);
@@ -121,6 +141,7 @@ export default function Home() {
   const [showLoader, setShowLoader] = useState(true);
   const [loaderFading, setLoaderFading] = useState(false);
   const mountTime = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
   const [streamingConvId, setStreamingConvId] = useState<string | null>(null);
 
   useEffect(() => { mountTime.current = Date.now(); }, []);
@@ -192,7 +213,8 @@ export default function Home() {
     const conv = newConversation();
     setConversations(prev => [conv, ...prev]);
     setActiveId(conv.id);
-    setFakeStreamText("");
+    setFakeTokens([]);
+    setFakeCount(0);
   }
 
   async function handleDelete(id: string) {
@@ -251,10 +273,16 @@ export default function Home() {
     setStreamingConvId(activeId);
     setIsStreaming(true);
     setIsFakeStreaming(false);
-    setFakeStreamText("");
+    setFakeTokens([]);
+    setFakeCount(0);
     setProgressStage("");
+    let trailState = emptyTrail();
+    setTrail(trailState);
+    const streamStart = Date.now();
 
     const sessionId = activeConv?.sessionId;
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     try {
       const userId = (session?.user as { id?: string })?.id;
@@ -266,6 +294,7 @@ export default function Home() {
           ...(userId ? { "X-User-Id": userId } : {}),
         },
         body: JSON.stringify({ query, session_id: sessionId, k, year_from: yearFrom }),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -303,6 +332,8 @@ export default function Home() {
           const msg = JSON.parse(line.slice(6));
           if (msg.type === "progress") {
             const event = msg.data as string;
+            trailState = applyProgress(trailState, event);
+            setTrail(trailState);
             const parallelStart = event.match(/\[Orchestrator\] running (\d+) research threads in parallel/);
             if (parallelStart) { parallelTopics = []; parallelTotal = parseInt(parallelStart[1]); continue; }
             const threadMatch = event.match(/\[Orchestrator\] thread \d+\/\d+: (.+)/);
@@ -313,6 +344,10 @@ export default function Home() {
             }
             const l = toStageLabel(event);
             if (l) setProgressStage(l);
+          }
+          else if (msg.type === "paper") {
+            trailState = applyPaper(trailState, msg.data);
+            setTrail(trailState);
           }
           else if (msg.type === "result") finalResult = msg.data as ResearchResult;
           else if (msg.type === "suggestion") suggestionMsg = msg.data as string;
@@ -337,36 +372,43 @@ export default function Home() {
 
       if (finalResult) {
         const fr = remapCitations(finalResult);
+        // Close the trail: cite the papers that made the cut, dim the rest, collapse to a summary.
+        const finishedTrail = finalizeTrail(trailState, fr.papers, Date.now() - streamStart);
+        setTrail(finishedTrail);
         setIsStreaming(false);
 
-        // Commit full result immediately (evidence panel populates)
+        // Commit full result immediately (evidence panel populates); keep the trail on the message
         setConversations(prev => prev.map(c => {
           if (c.id !== activeId) return c;
           const msgs = [...c.messages];
-          msgs[msgs.length - 1] = { role: "assistant", result: fr };
+          msgs[msgs.length - 1] = { role: "assistant", result: fr, trail: finishedTrail };
           return { ...c, depthReached: fr.depth_reached, papersUsed: fr.papers_used, sessionId: fr.session_id, messages: msgs };
         }));
 
-        // Fake-stream the formatted answer
+        // Let the trail ease closed, then fake-stream the formatted answer beneath it.
+        // isFakeStreaming goes true now so the committed result stays hidden (just a cursor
+        // shows) while the trail collapses; tokens start revealing after the delay.
         const tokens = tokenise(fr.answer_paragraphs);
+        setFakeTokens(tokens);
+        setFakeCount(0);
         setIsFakeStreaming(true);
-        setFakeStreamText("");
-        let revealed = "";
-        let i = 0;
-        const tick = setInterval(() => {
-          if (i >= tokens.length) {
-            clearInterval(tick);
-            setIsFakeStreaming(false);
-            setStreamingConvId(null);
-            if (status === "unauthenticated") {
-              setAnonQueryDone(true);
-              localStorage.setItem("scholr_anon_done", "true");
+        setTimeout(() => {
+          let i = 0;
+          const tick = setInterval(() => {
+            if (i >= tokens.length) {
+              clearInterval(tick);
+              setIsFakeStreaming(false);
+              setStreamingConvId(null);
+              if (status === "unauthenticated") {
+                setAnonQueryDone(true);
+                localStorage.setItem("scholr_anon_done", "true");
+              }
+              return;
             }
-            return;
-          }
-          revealed += tokens[i++];
-          setFakeStreamText(revealed);
-        }, 22);
+            i++;
+            setFakeCount(i);
+          }, 26);
+        }, 520);
 
         if (status === "authenticated") {
           if (isFirstQuery) {
@@ -395,9 +437,27 @@ export default function Home() {
         }
       }
     } catch (e) {
+      if ((e as Error).name === "AbortError") {
+        // Research cancelled by the user — clean up and mark the message.
+        setIsStreaming(false);
+        setIsFakeStreaming(false);
+        setTrail(null);
+        setStreamingConvId(null);
+        setConversations(prev => prev.map(c => {
+          if (c.id !== activeId) return c;
+          const msgs = [...c.messages];
+          msgs[msgs.length - 1] = { role: "assistant", result: null, error: "Research cancelled." };
+          return { ...c, messages: msgs };
+        }));
+        return;
+      }
       console.error(e);
       setIsStreaming(false);
     }
+  }
+
+  function handleStop() {
+    abortRef.current?.abort();
   }
 
   function handleCiteClick(n: number) {
@@ -448,10 +508,12 @@ export default function Home() {
           <div className="pane-content-in" style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <Thread
               messages={activeConv.messages}
-              fakeStreamText={fakeStreamText}
+              fakeTokens={fakeTokens}
+              fakeCount={fakeCount}
               isFakeStreaming={isFakeStreaming && streamingConvId === activeId}
               isStreaming={isStreaming && streamingConvId === activeId}
               progressStage={progressStage}
+              trail={trail}
               hoveredCite={hoveredCite}
               onHover={setHoveredCite}
               onCiteClick={handleCiteClick}
@@ -464,7 +526,7 @@ export default function Home() {
               onMobileSources={() => setMobileEvidenceOpen(true)}
               sourcesCount={citedPapers.length}
             />
-            <Composer onSubmit={handleSubmit} disabled={isStreaming} depth={depth} onDepthChange={setDepth} yearFrom={yearFrom} onYearFromChange={setYearFrom} k={k} onKChange={setK} />
+            <Composer onSubmit={handleSubmit} onStop={handleStop} isStreaming={isStreaming} disabled={isStreaming} depth={depth} onDepthChange={setDepth} yearFrom={yearFrom} onYearFromChange={setYearFrom} k={k} onKChange={setK} />
           </div>
         ) : (
           <div className="app__empty pane-content-in">

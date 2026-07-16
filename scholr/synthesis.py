@@ -4,14 +4,17 @@ from scholr.llm import get_client, llm_parse
 from scholr.state import ResearchState, SynthesisResult
 
 # A real synthesis is ~1–2k tokens. Capping well below gpt-4o-mini's 16k ceiling means a
-# degenerate generation loop fails in seconds instead of running to the ceiling for minutes.
-_SYNTH_MAX_TOKENS = 5000
+# degenerate generation loop fails in tens of seconds instead of running to the ceiling for
+# minutes. 3500 keeps headroom over a legitimately rich synthesis while failing runaways fast.
+_SYNTH_MAX_TOKENS = 3500
 # On a length failure, retry over fewer papers — the runaway is driven by too many facts
 # feeding a combinatorial evidence_map, so a smaller pool completes reliably.
 _SYNTH_RETRY_PAPERS = 8
 
 _SYSTEM = """You are a scientific synthesis engine. Produce a structured explanation grounded \
 entirely in the provided paper facts. Rules:
+- Be concise and non-repetitive — never restate a claim, sentence, or paragraph you have \
+already written, and keep each evidence_map entry a distinct claim
 - Every claim in evidence_map MUST cite at least one paper_id from the provided list
 - Do NOT make any claim that is not supported by a paper_id in the list
 - papers_used must equal the number of distinct paper_ids cited across all evidence_map entries

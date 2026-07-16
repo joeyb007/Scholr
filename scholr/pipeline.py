@@ -26,6 +26,18 @@ async def _timed(label: str, coro, on_event: Callable[[str], None]):
     return result
 
 
+def _emit_papers(papers: list[Paper], on_event: Callable[[str], None]) -> None:
+    """Stream each retrieved paper to the UI as a tab-delimited [Paper] marker so
+    sources can accumulate live. api.py converts these into structured `paper` events."""
+    for p in papers:
+        title = (p.title or "").replace("\t", " ")
+        authors = (p.authors or "").replace("\t", " ")
+        abstract = (p.abstract or "").replace("\t", " ").replace("\n", " ").strip()
+        if len(abstract) > 220:
+            abstract = abstract[:220].rstrip() + "…"
+        on_event(f"[Paper]\t{p.paper_id}\t{title}\t{authors}\t{p.year or ''}\t{abstract}")
+
+
 async def _gather_candidates(
     query: str,
     session_id: str,
@@ -54,6 +66,7 @@ async def _gather_candidates(
         if new_papers:
             state.papers.extend(new_papers)
             last_batch = new_papers
+            _emit_papers(new_papers, on_event)
             on_event(f"[Retrieval] {len(new_papers)} papers found, {len(state.papers)} total")
             break
         failed_queries = list(state.planned_queries)
@@ -98,6 +111,7 @@ async def _gather_candidates(
         )
         state.papers.extend(extra)
         last_batch = extra
+        _emit_papers(extra, on_event)
         on_event(f"[Retrieval] {len(extra)} new papers, {len(state.papers)} total")
 
     return state

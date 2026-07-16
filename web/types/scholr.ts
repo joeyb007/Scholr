@@ -27,6 +27,7 @@ export interface ConversationMessage {
   result?: ResearchResult | null;
   error?: string;
   suggestion?: string;
+  trail?: import("@/lib/trail").TrailState | null;
 }
 
 export interface Conversation {

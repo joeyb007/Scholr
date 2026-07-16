@@ -2,7 +2,46 @@
 
 import { useState } from "react";
 import type { ConversationMessage, ResearchResult } from "@/types/scholr";
-import { ParsedText } from "./CitePill";
+import type { TrailState } from "@/lib/trail";
+import { ParsedText, CitePill } from "./CitePill";
+import { ResearchTrail } from "./ResearchTrail";
+
+// Reveals the answer token-by-token, each token fading in with a stable key so only
+// newly-revealed tokens animate (no re-parsing the whole string each tick → no pop).
+function StreamingAnswer({ tokens, count, hoveredCite, onHover, onCiteClick }: {
+  tokens: string[];
+  count: number;
+  hoveredCite: number | null;
+  onHover: (n: number | null) => void;
+  onCiteClick: (n: number) => void;
+}) {
+  const paras: { tok: string; idx: number }[][] = [[]];
+  tokens.slice(0, count).forEach((tok, idx) => {
+    if (tok === "\n\n") paras.push([]);
+    else paras[paras.length - 1].push({ tok, idx });
+  });
+  return (
+    <div className="answer__body">
+      {paras.map((para, pi) => (
+        <p key={pi}>
+          {para.map(({ tok, idx }) => {
+            const cite = tok.match(/^\[(\d+)\]$/);
+            if (cite) {
+              return (
+                <span key={idx} className="tok">
+                  <CitePill n={parseInt(cite[1])} hoveredCite={hoveredCite} onHover={onHover} onCiteClick={onCiteClick} />
+                </span>
+              );
+            }
+            const bold = tok.match(/^\*\*([^*]+)\*\*$/);
+            if (bold) return <strong key={idx} className="tok answer__bold">{bold[1]}</strong>;
+            return <span key={idx} className="tok">{tok}</span>;
+          })}
+        </p>
+      ))}
+    </div>
+  );
+}
 
 interface SectionRowProps {
   label: string;
@@ -39,6 +78,24 @@ function PriorPill({ query, expanded, onToggle }: PriorPillProps) {
   );
 }
 
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      className="answer__copy"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch { /* clipboard unavailable */ }
+      }}
+    >
+      {copied ? "✓ copied" : "⧉ copy"}
+    </button>
+  );
+}
+
 interface AssistantMessageProps {
   result: ResearchResult | null;
   hoveredCite: number | null;
@@ -52,7 +109,10 @@ function AssistantMessage({ result, hoveredCite, onHover, onCiteClick, onFollowU
 
   return (
     <div className="answer">
-      <div className="answer__label">Answer</div>
+      <div className="answer__label-row">
+        <div className="answer__label">Answer</div>
+        <CopyButton text={result.answer_paragraphs.map(p => p.replace(/\*\*/g, "")).join("\n\n")} />
+      </div>
       <div className="answer__body">
         {result.answer_paragraphs.map((p, i) => (
           <p key={i}>
@@ -110,10 +170,12 @@ function stageProgress(stage: string): number {
 
 interface ThreadProps {
   messages: ConversationMessage[];
-  fakeStreamText: string;
+  fakeTokens: string[];
+  fakeCount: number;
   isFakeStreaming: boolean;
   isStreaming: boolean;
   progressStage: string;
+  trail: TrailState | null;
   hoveredCite: number | null;
   onHover: (n: number | null) => void;
   onCiteClick: (n: number) => void;
@@ -127,7 +189,7 @@ interface ThreadProps {
   sourcesCount?: number;
 }
 
-export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming, progressStage, hoveredCite, onHover, onCiteClick, onFollowUp, onExportBibtex, onShare, title, sessionId, onMobileMenu, onMobileSources, sourcesCount }: ThreadProps) {
+export function Thread({ messages, fakeTokens, fakeCount, isFakeStreaming, isStreaming, progressStage, trail, hoveredCite, onHover, onCiteClick, onFollowUp, onExportBibtex, onShare, title, sessionId, onMobileMenu, onMobileSources, sourcesCount }: ThreadProps) {
   const [expandedPriors, setExpandedPriors] = useState<Set<number>>(new Set());
 
   function togglePrior(i: number) {
@@ -212,11 +274,13 @@ export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming,
           }
 
           const isLast = i === messages.length - 1;
-          const showProgress = isLast && isStreaming && progressStage;
           const showFake = isLast && isFakeStreaming;
+          // Trail: live (page-level) during research, then the collapsed summary from the message.
+          const activeTrail = msg.trail ?? (isLast && isStreaming ? trail : null);
           return (
             <div key={i}>
-              {showProgress && (
+              {activeTrail && <ResearchTrail trail={activeTrail} />}
+              {isLast && isStreaming && !activeTrail && progressStage && (
                 <div className="progress">
                   <div className="progress__bar-track">
                     <div className={`progress__bar-fill${progressStage.includes(" · ") ? " progress__bar-fill--pulse" : ""}`} style={{ width: `${stageProgress(progressStage)}%` }} />
@@ -230,14 +294,7 @@ export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming,
               {showFake && (
                 <div className="answer">
                   <div className="answer__label">Answer</div>
-                  <div className="answer__body">
-                    {fakeStreamText.split("\n\n").map((para, pi) => (
-                      <p key={pi}>
-                        <ParsedText text={para} hoveredCite={hoveredCite} onHover={onHover} onCiteClick={onCiteClick} />
-                        {pi === fakeStreamText.split("\n\n").length - 1 && <span className="answer__cursor">▌</span>}
-                      </p>
-                    ))}
-                  </div>
+                  <StreamingAnswer tokens={fakeTokens} count={fakeCount} hoveredCite={hoveredCite} onHover={onHover} onCiteClick={onCiteClick} />
                 </div>
               )}
               {!isStreaming && !showFake && msg.suggestion && (
@@ -250,6 +307,9 @@ export function Thread({ messages, fakeStreamText, isFakeStreaming, isStreaming,
                 <div className="answer">
                   <div className="answer__label">Error</div>
                   <div className="answer__error">{msg.error}</div>
+                  {messages[i - 1]?.query && (
+                    <button className="answer__retry" onClick={() => onFollowUp(messages[i - 1].query!)}>↻ try again</button>
+                  )}
                 </div>
               )}
               {!isStreaming && !showFake && msg.result && (

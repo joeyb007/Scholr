@@ -6,9 +6,12 @@ from scholr.state import ResearchState
 _DB_URL = os.environ.get("DATABASE_URL")
 
 
+_CONNECT_TIMEOUT = 10  # fail fast if the DB is unreachable — session storage is best-effort
+
+
 def _sync_load(session_id: str) -> str | None:
     import psycopg2
-    conn = psycopg2.connect(_DB_URL)
+    conn = psycopg2.connect(_DB_URL, connect_timeout=_CONNECT_TIMEOUT)
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT state FROM research_sessions WHERE session_id = %s", (session_id,))
@@ -20,7 +23,7 @@ def _sync_load(session_id: str) -> str | None:
 
 def _sync_save(session_id: str, state_json: str) -> None:
     import psycopg2
-    conn = psycopg2.connect(_DB_URL)
+    conn = psycopg2.connect(_DB_URL, connect_timeout=_CONNECT_TIMEOUT)
     try:
         with conn.cursor() as cur:
             cur.execute(

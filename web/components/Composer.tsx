@@ -81,6 +81,8 @@ function ChipPopover({ chipLabel, title, description, options, value, onChange, 
 
 interface ComposerProps {
   onSubmit: (query: string) => void;
+  onStop?: () => void;
+  isStreaming?: boolean;
   disabled: boolean;
   depth: number;
   onDepthChange: (d: number) => void;
@@ -90,7 +92,7 @@ interface ComposerProps {
   onKChange: (k: number) => void;
 }
 
-export function Composer({ onSubmit, disabled, depth, onDepthChange, yearFrom, onYearFromChange, k, onKChange }: ComposerProps) {
+export function Composer({ onSubmit, onStop, isStreaming, disabled, depth, onDepthChange, yearFrom, onYearFromChange, k, onKChange }: ComposerProps) {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -169,10 +171,17 @@ export function Composer({ onSubmit, disabled, depth, onDepthChange, yearFrom, o
             onChange={v => onKChange(v ?? 8)}
             active={k !== 8}
           />
-          <button
-            className={`composer__send${text.trim() && !disabled ? " composer__send--active" : ""}`}
-            onMouseDown={e => { e.preventDefault(); handleSubmit(); }}
-          >↵ send</button>
+          {isStreaming && onStop ? (
+            <button
+              className="composer__stop"
+              onMouseDown={e => { e.preventDefault(); onStop(); }}
+            >◼ stop</button>
+          ) : (
+            <button
+              className={`composer__send${text.trim() && !disabled ? " composer__send--active" : ""}`}
+              onMouseDown={e => { e.preventDefault(); handleSubmit(); }}
+            >↵ send</button>
+          )}
         </div>
       </div>
     </div>
