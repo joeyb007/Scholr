@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import traceback
 from uuid import uuid4
 from dotenv import load_dotenv
@@ -132,6 +133,22 @@ async def research(body: ResearchRequest, request: Request):
     logger.info("Query received: %r (session=%s, k=%d, year_from=%s)", body.query, session_id, body.k, body.year_from)
 
     def on_event(event: str) -> None:
+        # Paper markers (optionally prefixed with a subtopic, e.g. "[CNNs] [Paper]\t…")
+        # become structured `paper` events so the UI can stream sources in live.
+        marker = "[Paper]\t"
+        idx = event.find(marker)
+        if idx != -1:
+            angle_m = re.match(r"^\s*\[([^\]]+)\]", event[:idx])
+            parts = event[idx + len(marker):].split("\t")
+            queue.put_nowait(_sse("paper", {
+                "id": parts[0] if len(parts) > 0 else "",
+                "angle": angle_m.group(1) if angle_m else "",
+                "title": parts[1] if len(parts) > 1 else "",
+                "authors": parts[2] if len(parts) > 2 else "",
+                "year": parts[3] if len(parts) > 3 else "",
+                "abstract": parts[4] if len(parts) > 4 else "",
+            }))
+            return
         logger.info(event)
         queue.put_nowait(_sse("progress", event))
 
