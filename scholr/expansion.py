@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 from scholr.llm import llm_parse
 from scholr.reranking import select_top_by_similarity
@@ -25,7 +26,9 @@ async def expand_papers(
     """Expands only the most relevant papers from the given candidate batch (the
     papers just retrieved), not the full accumulated pool. Narrowing by bi-encoder
     relevance keeps follow-up queries on-topic and caps expansion output cost."""
-    focused = select_top_by_similarity(state.query, candidates, EXPAND_TOP_N)
+    # Bi-encoder inference is synchronous and CPU-bound — offload it so it doesn't block
+    # the event loop (and starve concurrent threads' I/O) while it runs on Railway's CPU.
+    focused = await asyncio.to_thread(select_top_by_similarity, state.query, candidates, EXPAND_TOP_N)
     on_event(f"[Expansion] processing {len(focused)} of {len(candidates)} new papers")
     if not focused:
         return ExpansionOutput(expansions=[])

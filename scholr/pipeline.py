@@ -118,7 +118,11 @@ async def run_pipeline(
     if len(state.papers) > MAX_PAPERS:
         on_event(f"[Rerank] narrowing {len(state.papers)} candidates to {MAX_PAPERS}")
         t0 = time.perf_counter()
-        state.papers = rerank_papers(state.query, state.papers, BI_ENCODER_TOP_N, MAX_PAPERS)
+        # Model inference is synchronous and CPU-bound — run it off the event loop so it
+        # doesn't block concurrent subtopic threads' I/O or stall the SSE stream.
+        state.papers = await asyncio.to_thread(
+            rerank_papers, state.query, state.papers, BI_ENCODER_TOP_N, MAX_PAPERS
+        )
         on_event(f"[Timing] rerank: {(time.perf_counter() - t0) * 1000:.0f}ms")
 
     on_event(f"[Compression] extracting key points from {len(state.papers)} papers")
