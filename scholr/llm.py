@@ -33,9 +33,10 @@ async def llm_parse(
     user: str,
     response_format: type[BaseModel],
     max_tokens: int | None = None,
+    model: str | None = None,
 ) -> BaseModel:
     result = await client.beta.chat.completions.parse(
-        model=MODEL,
+        model=model or MODEL,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},

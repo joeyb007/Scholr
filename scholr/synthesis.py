@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from openai import LengthFinishReasonError
 from scholr.llm import get_client, llm_parse
-from scholr.state import ResearchState, SynthesisResult
+from scholr.state import EvidenceClaim, ResearchState, SynthesisResult
 
 # A real synthesis is ~1–2k tokens. Capping well below gpt-4o-mini's 16k ceiling means a
 # degenerate generation loop fails in tens of seconds instead of running to the ceiling for
@@ -77,24 +77,66 @@ async def stream_answer(
     return full_text
 
 
+def _fallback_synthesis(state: ResearchState) -> SynthesisResult:
+    """Build a minimal grounded result from the compressed facts so a query degrades to a
+    real cited answer instead of erroring when the model won't emit valid structured output."""
+    papers = state.papers
+    id_to_n = {p.paper_id: i + 1 for i, p in enumerate(papers)}
+    claims: list[EvidenceClaim] = []
+    para_bits: list[str] = []
+    for p in papers[:8]:
+        facts = state.paper_facts.get(p.paper_id) or []
+        if not facts:
+            continue
+        claims.append(EvidenceClaim(claim=facts[0], paper_ids=[p.paper_id]))
+        para_bits.append(f"{facts[0]} [{id_to_n[p.paper_id]}]")
+    if not claims and papers:
+        claims = [EvidenceClaim(claim=papers[0].title or "See sources.", paper_ids=[papers[0].paper_id])]
+    answer = " ".join(para_bits) or "The most relevant papers on this topic are listed in the sources."
+    return SynthesisResult(
+        final_answer=answer,
+        answer_paragraphs=[answer] if answer else [],
+        key_concepts=[],
+        intuition="", mechanism="", limitations="", open_questions="",
+        evidence_map=claims,
+        follow_up_questions=[],
+        papers_used=len({pid for c in claims for pid in c.paper_ids}),
+        depth_reached=state.depth_reached,
+    )
+
+
+async def synthesize_structured(
+    system: str,
+    user: str,
+    state: ResearchState,
+    on_event: Callable[[str], None],
+    retry_user: str | None = None,
+) -> SynthesisResult:
+    """Structured synthesis that never raises on a runaway. gpt-4o-mini occasionally falls into
+    a repetition loop and blows the token cap; on that failure we escalate to gpt-4o (far less
+    loop-prone), and if even that fails we return a grounded fallback rather than error out."""
+    try:
+        return await llm_parse(system, user, SynthesisResult, max_tokens=_SYNTH_MAX_TOKENS)
+    except LengthFinishReasonError:
+        on_event("[Synthesis] output truncated — retrying with gpt-4o")
+        try:
+            return await llm_parse(
+                system, retry_user or user, SynthesisResult,
+                max_tokens=_SYNTH_MAX_TOKENS, model="gpt-4o",
+            )
+        except Exception:
+            on_event("[Synthesis] falling back to grounded summary")
+            return _fallback_synthesis(state)
+
+
 async def synthesize(
     state: ResearchState,
     on_event: Callable[[str], None],
 ) -> SynthesisResult:
     on_event("[Synthesis] building evidence map")
-    try:
-        result = await llm_parse(
-            _SYSTEM, _build_user_prompt(state), SynthesisResult, max_tokens=_SYNTH_MAX_TOKENS
-        )
-    except LengthFinishReasonError:
-        # Runaway generation hit the token cap — retry over a smaller paper pool so the
-        # structured output stays bounded rather than dropping the whole subtopic.
-        on_event(f"[Synthesis] output truncated — retrying with top {_SYNTH_RETRY_PAPERS} papers")
-        result = await llm_parse(
-            _SYSTEM,
-            _build_user_prompt(state, max_papers=_SYNTH_RETRY_PAPERS),
-            SynthesisResult,
-            max_tokens=_SYNTH_MAX_TOKENS,
-        )
+    result = await synthesize_structured(
+        _SYSTEM, _build_user_prompt(state), state, on_event,
+        retry_user=_build_user_prompt(state, max_papers=_SYNTH_RETRY_PAPERS),
+    )
     on_event(f"[Synthesis] {len(result.evidence_map)} evidence claims")
     return result

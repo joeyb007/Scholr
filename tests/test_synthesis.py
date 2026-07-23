@@ -82,6 +82,25 @@ async def test_synthesize_retries_on_length_failure(mocker, sample_synthesis):
     assert any("retrying" in e for e in events)
 
 
+async def test_synthesize_falls_back_when_both_attempts_fail(mocker):
+    from openai import LengthFinishReasonError
+    from scholr.state import SynthesisResult
+
+    # Both the initial call and the gpt-4o retry run away — must degrade, never raise.
+    mocker.patch(
+        "scholr.synthesis.llm_parse",
+        new_callable=AsyncMock,
+        side_effect=LengthFinishReasonError(completion=MagicMock()),
+    )
+    events = []
+    result = await synthesize(_make_state(), events.append)
+
+    assert isinstance(result, SynthesisResult)
+    assert result.final_answer != ""            # grounded fallback answer
+    assert len(result.evidence_map) >= 1         # cited from the paper facts
+    assert any("falling back" in e for e in events)
+
+
 async def test_synthesize_returns_answer_paragraphs(mocker, sample_synthesis):
     mocker.patch("scholr.synthesis.llm_parse", new_callable=AsyncMock, return_value=sample_synthesis)
     result = await synthesize(_make_state(), lambda _: None)

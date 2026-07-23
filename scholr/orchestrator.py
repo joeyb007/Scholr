@@ -4,13 +4,11 @@ from uuid import uuid4
 
 from scholr.decomposer import decompose_query
 from scholr.session import load_session
-from scholr.llm import get_client, llm_parse
+from scholr.llm import get_client
 from scholr.pipeline import _validate_evidence, run_pipeline
 from scholr.session import fresh_state, save_session
-from scholr.state import (
-    EvidenceClaim, ResearchState, SynthesisResult, existing_ids
-)
-from scholr.synthesis import _SYSTEM as _SYNTH_SYSTEM, _build_user_prompt, stream_answer
+from scholr.state import ResearchState
+from scholr.synthesis import _SYSTEM as _SYNTH_SYSTEM, _build_user_prompt, stream_answer, synthesize_structured
 
 MAX_ORCHESTRATORS = 5
 
@@ -157,7 +155,7 @@ async def _compare_synthesize(
                 streamed_answer += delta
 
     on_event("[Synthesis] building evidence map")
-    result = await llm_parse(_COMPARE_SYSTEM, user, SynthesisResult)
+    result = await synthesize_structured(_COMPARE_SYSTEM, user, state, on_event)
     on_event(f"[Synthesis] {len(result.evidence_map)} evidence claims")
 
     if streamed_answer is not None:
